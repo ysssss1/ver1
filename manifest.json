@@ -1,0 +1,27 @@
+{
+  "name": "ReturnRx — 의약품 반품 관리",
+  "short_name": "ReturnRx",
+  "description": "의약품 계수, 반품 목록 정리, QR 스캔",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F4F7",
+  "theme_color": "#2563EB",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["medical", "productivity"],
+  "screenshots": []
+}

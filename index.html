@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ReturnRx</title>
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ReturnRx">
+<meta name="theme-color" content="#2563EB">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #F2F4F7;
+  --surface: #FFFFFF;
+  --primary: #2563EB;
+  --primary-dark: #1D4ED8;
+  --primary-light: #EFF6FF;
+  --text: #111827;
+  --text-muted: #6B7280;
+  --border: #E5E7EB;
+  --ok: #059669;
+  --ok-light: #ECFDF5;
+  --danger: #DC2626;
+  --danger-light: #FEF2F2;
+  --warn: #D97706;
+  --warn-light: #FFFBEB;
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Pretendard', 'Apple SD Gothic Neo', sans-serif; max-width: 430px; margin: 0 auto; min-height: 100vh; }
+
+/* NAV */
+.nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: var(--surface); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(3,1fr); z-index: 100; padding-bottom: env(safe-area-inset-bottom,12px); }
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 11px 0 9px; border: none; background: none; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; letter-spacing: -0.01em; }
+.nav-item.on { color: var(--primary); }
+.nav-item svg { width: 23px; height: 23px; }
+
+/* SCREENS */
+.screen { display: none; padding-bottom: 90px; min-height: 100vh; }
+.screen.on { display: block; }
+
+/* HEADER */
+.hd { background: var(--surface); padding: 20px 20px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+.hd-title { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+.hd-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+/* SECTION */
+.sec { margin: 14px 16px 0; }
+.sec-label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
+
+/* CARD */
+.card { background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+.card + .card { margin-top: 10px; }
+
+/* COUNTER AREA */
+.upload-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 180px; gap: 10px; cursor: pointer; position: relative; border: 2px dashed var(--border); border-radius: var(--radius); background: var(--surface); transition: border-color 0.15s; }
+.upload-zone:active { border-color: var(--primary); }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-icon { width: 52px; height: 52px; background: var(--primary-light); border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+.upload-icon svg { width: 26px; height: 26px; color: var(--primary); }
+.upload-text { font-size: 14px; font-weight: 600; color: var(--text); }
+.upload-sub { font-size: 12px; color: var(--text-muted); }
+
+.img-wrap { position: relative; border-radius: var(--radius); overflow: hidden; }
+.img-wrap img { width: 100%; display: block; max-height: 280px; object-fit: contain; background: #000; }
+.img-wrap canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.result-bar { background: var(--text); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; }
+.result-count { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
+.result-label { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+.result-badge { background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 99px; }
+
+.loading-box { padding: 24px; display: flex; align-items: center; gap: 12px; }
+.loading-dots { display: flex; gap: 5px; }
+.loading-dots span { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: ld 0.9s infinite; display: inline-block; }
+.loading-dots span:nth-child(2){animation-delay:.15s}
+.loading-dots span:nth-child(3){animation-delay:.3s}
+@keyframes ld{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
+.loading-text { font-size: 14px; color: var(--text-muted); }
+
+.btn-retake { width: 100%; padding: 13px; background: var(--bg); border: none; border-radius: 0; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.btn-retake:active { background: var(--border); }
+
+/* FORM */
+.field { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.field:last-child { border-bottom: none; }
+.field-label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.03em; margin-bottom: 6px; }
+.field-input { width: 100%; border: none; outline: none; font-size: 16px; font-family: inherit; color: var(--text); background: transparent; padding: 0; }
+.field-input::placeholder { color: var(--border); }
+.field-input[type=date] { color: var(--text); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.field-row .field { border-bottom: none; }
+.field-row .field:first-child { border-right: 1px solid var(--border); }
+
+/* ITEM LIST */
+.item-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.item-row:last-child { border-bottom: none; }
+.item-num { width: 28px; height: 28px; background: var(--primary-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.item-del { background: none; border: none; padding: 6px; cursor: pointer; color: var(--text-muted); flex-shrink: 0; }
+.item-del svg { width: 17px; height: 17px; }
+
+.empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+/* BUTTONS */
+.btn-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 32px); margin: 12px 16px; padding: 15px; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: -0.01em; }
+.btn-add:active { background: var(--primary-dark); transform: scale(0.99); }
+.btn-add svg { width: 18px; height: 18px; }
+
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 16px 12px; }
+.btn-half { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 14px; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; }
+.btn-half:active { transform: scale(0.98); }
+.btn-excel { background: var(--ok-light); color: var(--ok); }
+.btn-mail { background: var(--primary-light); color: var(--primary); }
+.btn-half svg { width: 17px; height: 17px; }
+
+/* QR SCAN */
+.cam-wrap { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; min-height: 240px; display: flex; align-items: center; justify-content: center; }
+.cam-wrap video { width: 100%; display: block; }
+.cam-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.qr-frame { width: 180px; height: 180px; position: relative; }
+.qr-frame::before { content:''; position:absolute; inset:0; border:1.5px solid rgba(255,255,255,0.25); border-radius:12px; }
+.qr-corner { position:absolute; width:24px; height:24px; border-color:#fff; border-style:solid; }
+.qr-corner.tl{top:-1px;left:-1px;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
+.qr-corner.tr{top:-1px;right:-1px;border-width:3px 3px 0 0;border-radius:0 8px 0 0}
+.qr-corner.bl{bottom:-1px;left:-1px;border-width:0 0 3px 3px;border-radius:0 0 0 8px}
+.qr-corner.br{bottom:-1px;right:-1px;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+.cam-hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; padding: 6px 14px; border-radius: 99px; white-space: nowrap; }
+.cam-placeholder { display: flex; flex-direction: column; align-items: center; gap: 10px; color: rgba(255,255,255,0.5); font-size: 13px; }
+
+.btn-scan-start { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 32px); margin: 12px 16px; padding: 15px; background: var(--text); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; }
+.btn-scan-start svg { width: 18px; height: 18px; }
+
+.scanned-result { margin: 0 16px; background: var(--primary-light); border-radius: var(--radius-sm); padding: 14px; font-size: 13px; color: var(--primary-dark); display: none; line-height: 1.7; }
+.scanned-result.on { display: block; }
+.scanned-title { font-weight: 800; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+
+/* TOAST */
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 11px 20px; border-radius: 99px; font-size: 13px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity 0.2s; white-space: nowrap; max-width: 90vw; text-align: center; pointer-events: none; }
+.toast.on { opacity: 1; }
+
+.badge-qty { display: inline-block; background: var(--text); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- ══════════ SCREEN 1: 계수기 ══════════ -->
+<div class="screen on" id="s-counter">
+  <div class="hd">
+    <div class="hd-title">📦 의약품 계수기</div>
+    <div class="hd-sub">사진을 찍으면 AI가 개수를 셉니다</div>
+  </div>
+
+  <div class="sec">
+    <div id="upload-area">
+      <label class="upload-zone">
+        <input type="file" accept="image/*" capture="environment" onchange="handleCounter(event)">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <div class="upload-text">사진 촬영 또는 선택</div>
+        <div class="upload-sub">의약품을 한눈에 담아주세요</div>
+      </label>
+    </div>
+
+    <div id="counter-result" style="display:none;">
+      <div class="card">
+        <div class="img-wrap">
+          <img id="counter-img" alt="">
+          <canvas id="counter-canvas"></canvas>
+        </div>
+        <div id="loading-box" class="loading-box">
+          <div class="loading-dots"><span></span><span></span><span></span></div>
+          <div class="loading-text">AI가 의약품 개수를 세는 중...</div>
+        </div>
+        <div id="result-box" style="display:none;">
+          <div class="result-bar">
+            <div>
+              <div class="result-count" id="count-num">—</div>
+              <div class="result-label">개 인식됨</div>
+            </div>
+            <div class="result-badge" id="count-badge">분석 완료</div>
+          </div>
+          <div style="padding:12px 18px;font-size:13px;color:var(--text-muted);line-height:1.5;" id="count-detail"></div>
+        </div>
+        <button class="btn-retake" onclick="resetCounter()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.86"/></svg>
+          다시 찍기
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCREEN 2: 반품 목록 ══════════ -->
+<div class="screen" id="s-list">
+  <div class="hd">
+    <div class="hd-title">📋 반품 목록</div>
+    <div class="hd-sub">의약품 정보를 입력하고 엑셀로 정리하세요</div>
+  </div>
+
+  <!-- 입력 폼 -->
+  <div class="sec">
+    <div class="sec-label">새 항목 추가</div>
+    <div class="card">
+      <div class="field">
+        <div class="field-label">의약품명</div>
+        <input class="field-input" id="f-name" type="text" placeholder="예: 타이레놀 500mg 60정">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">유통기한</div>
+          <input class="field-input" id="f-expiry" type="date">
+        </div>
+        <div class="field">
+          <div class="field-label">수량 (박스)</div>
+          <input class="field-input" id="f-qty" type="number" placeholder="1" min="1">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field" style="border-bottom:none;">
+          <div class="field-label">로트번호</div>
+          <input class="field-input" id="f-lot" type="text" placeholder="Lot No.">
+        </div>
+        <div class="field" style="border-bottom:none;">
+          <div class="field-label">일련번호</div>
+          <input class="field-input" id="f-serial" type="text" placeholder="Serial No.">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-add" onclick="addItem()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    목록에 추가
+  </button>
+
+  <!-- 목록 -->
+  <div class="sec" style="margin-top:4px;">
+    <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>추가된 항목 <span id="item-count-badge" class="badge-qty">0</span></span>
+      <span id="clear-btn" onclick="clearAll()" style="color:var(--danger);font-size:11px;font-weight:700;cursor:pointer;display:none;">전체 삭제</span>
+    </div>
+    <div class="card" id="item-list">
+      <div class="empty-state">아직 추가된 항목이 없습니다</div>
+    </div>
+  </div>
+
+  <!-- 내보내기 -->
+  <div class="sec" style="margin-top:12px;">
+    <div class="btn-row">
+      <button class="btn-half btn-excel" onclick="exportExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        엑셀 저장
+      </button>
+      <button class="btn-half btn-mail" onclick="sendEmail()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        이메일 발송
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCREEN 3: QR 스캔 ══════════ -->
+<div class="screen" id="s-qr">
+  <div class="hd">
+    <div class="hd-title">🔍 QR 스캔</div>
+    <div class="hd-sub">QR코드 스캔 → 정보 자동 입력</div>
+  </div>
+
+  <div class="sec">
+    <div class="card">
+      <div class="cam-wrap" id="cam-wrap">
+        <div class="cam-placeholder">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
+          카메라 시작 버튼을 눌러주세요
+        </div>
+        <video id="qr-video" autoplay playsinline muted style="display:none;width:100%;"></video>
+        <canvas id="qr-canvas" style="display:none;"></canvas>
+        <div class="cam-overlay" id="cam-overlay" style="display:none;">
+          <div class="qr-frame">
+            <div class="qr-corner tl"></div>
+            <div class="qr-corner tr"></div>
+            <div class="qr-corner bl"></div>
+            <div class="qr-corner br"></div>
+          </div>
+        </div>
+        <div class="cam-hint" id="cam-hint" style="display:none;">QR코드를 네모 안에 맞춰주세요</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-scan-start" id="scan-btn" onclick="toggleCamera()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
+    카메라 시작
+  </button>
+
+  <div class="scanned-result" id="scanned-result">
+    <div class="scanned-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      인식 완료 — 반품 목록에 추가되었습니다
+    </div>
+    <div id="scanned-detail"></div>
+  </div>
+
+  <div class="sec" style="margin-top:10px;">
+    <div class="card" style="padding:16px 18px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">💡 QR코드 형식 안내</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.7;">
+        국내 의약품 QR은 <strong>GS1 DataMatrix</strong> 형식으로<br>
+        유통기한·로트번호·일련번호가 자동 인식됩니다.<br>
+        인식 후 의약품명만 추가 입력하면 됩니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-item on" onclick="go('counter',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    계수기
+  </button>
+  <button class="nav-item" onclick="go('list',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    반품 목록
+  </button>
+  <button class="nav-item" onclick="go('qr',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
+    QR 스캔
+  </button>
+</nav>
+
+<script>
+// ── State ──
+let items = JSON.parse(localStorage.getItem('rx_items') || '[]');
+let camStream = null;
+let scanning = false;
+
+// ── Nav ──
+function go(id, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('on'));
+  document.getElementById('s-' + id).classList.add('on');
+  btn.classList.add('on');
+  if (id !== 'qr') stopCamera();
+  if (id === 'list') renderList();
+}
+
+// ══════════ COUNTER ══════════
+async function handleCounter(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  document.getElementById('upload-area').style.display = 'none';
+  document.getElementById('counter-result').style.display = 'block';
+  document.getElementById('loading-box').style.display = 'flex';
+  document.getElementById('result-box').style.display = 'none';
+
+  const img = document.getElementById('counter-img');
+  const url = URL.createObjectURL(file);
+  img.src = url;
+
+  const b64 = await toB64(file);
+  await runCounter(b64, file.type);
+}
+
+async function runCounter(b64, mime) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
+            { type: 'text', text: `이 사진에서 의약품 낱개/박스/포장 단위의 총 개수를 세어주세요.
+JSON만 응답 (마크다운 없이):
+{"count": 숫자, "unit": "낱개|박스|포|병|기타", "detail": "어떻게 셌는지 한 줄 설명", "confidence": "높음|보통|낮음"}` }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const txt = (data.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
+    let parsed = null;
+    try { parsed = JSON.parse(txt); } catch(e) {}
+
+    document.getElementById('loading-box').style.display = 'none';
+    document.getElementById('result-box').style.display = 'block';
+
+    if (parsed && parsed.count !== undefined) {
+      document.getElementById('count-num').textContent = parsed.count;
+      document.getElementById('count-badge').textContent = `${parsed.unit || '개'} · 신뢰도 ${parsed.confidence || '보통'}`;
+      document.getElementById('count-detail').textContent = parsed.detail || '';
+    } else {
+      document.getElementById('count-num').textContent = '?';
+      document.getElementById('count-badge').textContent = '인식 실패';
+      document.getElementById('count-detail').textContent = '이미지를 더 가까이 촬영하거나 조명을 밝게 해보세요.';
+    }
+  } catch(err) {
+    document.getElementById('loading-box').style.display = 'none';
+    document.getElementById('result-box').style.display = 'block';
+    document.getElementById('count-num').textContent = '!';
+    document.getElementById('count-badge').textContent = '오류';
+    document.getElementById('count-detail').textContent = '분석 중 오류가 발생했습니다. 다시 시도해주세요.';
+  }
+}
+
+function resetCounter() {
+  document.getElementById('upload-area').style.display = 'block';
+  document.getElementById('counter-result').style.display = 'none';
+  document.getElementById('counter-img').src = '';
+}
+
+// ══════════ RETURN LIST ══════════
+function saveItems() { localStorage.setItem('rx_items', JSON.stringify(items)); }
+
+function addItem() {
+  const name = document.getElementById('f-name').value.trim();
+  const expiry = document.getElementById('f-expiry').value;
+  if (!name) { toast('의약품명을 입력해주세요'); return; }
+
+  items.push({
+    id: Date.now(),
+    name,
+    expiry: expiry || '',
+    qty: parseInt(document.getElementById('f-qty').value) || 1,
+    lot: document.getElementById('f-lot').value.trim(),
+    serial: document.getElementById('f-serial').value.trim(),
+    addedAt: new Date().toISOString()
+  });
+  saveItems();
+
+  ['f-name','f-expiry','f-qty','f-lot','f-serial'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-qty').value = '';
+  renderList();
+  toast('✅ 추가되었습니다');
+}
+
+function removeItem(id) {
+  items = items.filter(i => i.id !== id);
+  saveItems();
+  renderList();
+}
+
+function clearAll() {
+  if (!confirm('전체 삭제하시겠습니까?')) return;
+  items = [];
+  saveItems();
+  renderList();
+}
+
+function renderList() {
+  const badge = document.getElementById('item-count-badge');
+  badge.textContent = items.length;
+  const clearBtn = document.getElementById('clear-btn');
+  clearBtn.style.display = items.length > 0 ? 'block' : 'none';
+
+  const el = document.getElementById('item-list');
+  if (items.length === 0) {
+    el.innerHTML = '<div class="empty-state">아직 추가된 항목이 없습니다<br><span style="font-size:12px;margin-top:4px;display:block;">위 양식을 작성 후 추가하세요</span></div>';
+    return;
+  }
+  el.innerHTML = items.map((item, i) => `
+    <div class="item-row">
+      <div class="item-num">${i+1}</div>
+      <div class="item-info">
+        <div class="item-name">${item.name}</div>
+        <div class="item-meta">
+          ${item.expiry ? `유통기한 ${item.expiry} · ` : ''}${item.qty}박스${item.lot ? ` · LOT ${item.lot}` : ''}
+        </div>
+      </div>
+      <button class="item-del" onclick="removeItem(${item.id})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+function exportExcel() {
+  if (items.length === 0) { toast('추가된 항목이 없습니다'); return; }
+  const wb = XLSX.utils.book_new();
+  const today = new Date().toLocaleDateString('ko-KR');
+
+  // 반품 신청서
+  const rows = [
+    ['의약품 반품 신청서'],
+    ['작성일:', today, '', '약국명:', ''],
+    [''],
+    ['번호', '의약품명', '유통기한', '수량(박스)', '로트번호', '일련번호', '반품사유']
+  ];
+  items.forEach((item, i) => {
+    rows.push([i+1, item.name, item.expiry || '', item.qty, item.lot || '', item.serial || '', '유통기한 만료/임박']);
+  });
+  rows.push([''], ['합계:', `${items.length}품목`, '', `총 ${items.reduce((s,i)=>s+i.qty,0)}박스`]);
+  rows.push([''], ['담당자 서명:', '', '', '확인자 서명:', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [4, 32, 13, 10, 18, 18, 16].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, '반품신청서');
+
+  const fname = `반품신청서_${today.replace(/[\.\s]/g,'')}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  toast('📥 엑셀 파일이 저장되었습니다');
+}
+
+function sendEmail() {
+  if (items.length === 0) { toast('추가된 항목이 없습니다'); return; }
+  const today = new Date().toLocaleDateString('ko-KR');
+  const subject = encodeURIComponent(`[반품 신청] ${today} 의약품 반품 요청`);
+  const lines = items.map((item, i) =>
+    `${i+1}. ${item.name}\n   유통기한: ${item.expiry||'-'} | 수량: ${item.qty}박스 | LOT: ${item.lot||'-'} | S/N: ${item.serial||'-'}`
+  ).join('\n');
+  const body = encodeURIComponent(
+    `안녕하세요,\n\n아래 의약품 반품을 요청드립니다.\n\n${lines}\n\n총 ${items.length}품목 / ${items.reduce((s,i)=>s+i.qty,0)}박스\n\n감사합니다.`
+  );
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  toast('이메일 앱을 열고 있습니다...');
+}
+
+// ══════════ QR SCAN ══════════
+async function toggleCamera() {
+  if (camStream) {
+    stopCamera();
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      camStream = stream;
+      scanning = true;
+      const video = document.getElementById('qr-video');
+      video.srcObject = stream;
+      video.style.display = 'block';
+      document.querySelector('.cam-placeholder').style.display = 'none';
+      document.getElementById('cam-overlay').style.display = 'flex';
+      document.getElementById('cam-hint').style.display = 'block';
+      document.getElementById('scan-btn').textContent = '⏹ 카메라 중지';
+      video.onloadedmetadata = () => qrLoop();
+      toast('QR코드를 화면 중앙에 맞춰주세요');
+    } catch(e) {
+      toast('카메라 권한이 필요합니다');
+    }
+  }
+}
+
+function stopCamera() {
+  scanning = false;
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  const video = document.getElementById('qr-video');
+  video.style.display = 'none';
+  document.querySelector('.cam-placeholder').style.display = 'flex';
+  document.getElementById('cam-overlay').style.display = 'none';
+  document.getElementById('cam-hint').style.display = 'none';
+  document.getElementById('scan-btn').innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg> 카메라 시작`;
+}
+
+async function qrLoop() {
+  if (!scanning || !camStream) return;
+  const video = document.getElementById('qr-video');
+  const canvas = document.getElementById('qr-canvas');
+  if (video.readyState < 2) { setTimeout(qrLoop, 300); return; }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  if ('BarcodeDetector' in window) {
+    try {
+      const det = new BarcodeDetector({ formats: ['qr_code','data_matrix','code_128','ean_13'] });
+      const codes = await det.detect(canvas);
+      if (codes.length > 0) {
+        stopCamera();
+        handleQRResult(codes[0].rawValue);
+        return;
+      }
+    } catch(e) {}
+  }
+  setTimeout(qrLoop, 400);
+}
+
+function handleQRResult(raw) {
+  // GS1 형식: (01)GTIN(17)YYMMDD(10)LOT(21)SERIAL
+  const gs1 = raw.match(/\(01\)(\d+)\(17\)(\d+)\(10\)([^\(]+)(?:\(21\)([^\(]*))?/);
+  let info = { name:'', expiry:'', lot:'', serial:'', qty:1 };
+
+  if (gs1) {
+    const e = gs1[2]; // YYMMDD
+    info.expiry = `20${e.slice(0,2)}-${e.slice(2,4)}-${e.slice(4,6)}`;
+    info.lot = gs1[3].trim();
+    info.serial = (gs1[4] || '').trim();
+  } else {
+    // 날짜 패턴 탐색
+    const dm = raw.match(/(\d{4}[-\/]\d{2}[-\/]\d{2})/);
+    if (dm) info.expiry = dm[1];
+    info.serial = raw.slice(0, 40);
+  }
+
+  // 반품 목록에 자동 추가 (이름은 나중에 편집 가능)
+  const newItem = { id: Date.now(), name: '(이름 입력 필요)', expiry: info.expiry, qty: 1, lot: info.lot, serial: info.serial, addedAt: new Date().toISOString() };
+  items.push(newItem);
+  saveItems();
+
+  const detail = [
+    info.expiry && `유통기한: ${info.expiry}`,
+    info.lot && `로트번호: ${info.lot}`,
+    info.serial && `일련번호: ${info.serial}`,
+  ].filter(Boolean).join(' · ');
+
+  document.getElementById('scanned-detail').textContent = detail || raw.slice(0, 60);
+  document.getElementById('scanned-result').classList.add('on');
+  toast('✅ QR 인식 완료! 반품 목록에서 이름을 입력해주세요');
+}
+
+// ── Utils ──
+function toB64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('on'), 2800);
+}
+
+// Init
+renderList();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.log('SW error', e));
+  });
+}
+</script>
+</body>
+</html>

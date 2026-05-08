@@ -315,28 +315,28 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,'Pretendar
     </div>
   </div>
 
-  <!-- 2단계: 박스 사진 촬영 -->
+  <!-- 2단계: 제조번호·사용기한 사진 찍기 -->
   <div id="step2-area" style="display:none;" class="sec">
     <div class="card" style="overflow:visible;">
       <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">📸 박스 뒷면을 찍어주세요</div>
-        <div style="font-size:12px;color:var(--muted);">사용기한·제조번호가 보이도록 찍으면 AI가 자동으로 읽습니다</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">📸 제조번호·사용기한 사진 찍기</div>
+        <div style="font-size:12px;color:var(--muted);">제조번호와 사용기한이 잘 보이도록 찍어주세요. AI가 자동으로 읽습니다.</div>
       </div>
       <!-- 사진 미리보기 -->
       <div id="box-img-wrap" style="display:none;background:#111;max-height:240px;overflow:hidden;">
         <img id="box-img" style="width:100%;max-height:240px;object-fit:contain;display:block;" alt="">
       </div>
       <!-- AI 분석 중 -->
-      <div id="box-loading" style="display:none;padding:18px 16px;display:none;align-items:center;gap:10px;">
+      <div id="box-loading" style="display:none;padding:18px 16px;align-items:center;gap:10px;">
         <div class="dots"><span></span><span></span><span></span></div>
-        <span style="font-size:13px;color:var(--muted);">AI가 사용기한·제조번호 읽는 중...</span>
+        <span style="font-size:13px;color:var(--muted);">AI가 제조번호·사용기한 읽는 중...</span>
       </div>
-      <!-- 촬영 버튼 -->
-      <label id="box-photo-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:var(--primary);color:#fff;font-size:14px;font-weight:700;cursor:pointer;border-top:1px solid var(--border);">
+      <!-- 촬영 버튼 — button으로 변경, 클릭시 hidden input trigger -->
+      <input type="file" id="box-file-input" accept="image/*" capture="environment" style="display:none;" onchange="handleBoxPhoto(event)">
+      <button id="box-photo-btn" onclick="document.getElementById('box-file-input').click()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:var(--primary);color:#fff;font-size:14px;font-weight:700;cursor:pointer;border:none;width:100%;border-top:1px solid var(--border);">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        사진 촬영 / 갤러리 선택
-        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleBoxPhoto(event)">
-      </label>
+        📷 카메라로 사진 찍기
+      </button>
     </div>
   </div>
 
@@ -717,45 +717,105 @@ function skipStep2(){
 
 async function handleBoxPhoto(e){
   const file=e.target.files[0]; if(!file)return; e.target.value='';
+
+  // 미리보기
   const img=document.getElementById('box-img');
   img.src=URL.createObjectURL(file);
   document.getElementById('box-img-wrap').style.display='block';
   document.getElementById('box-loading').style.display='flex';
   document.getElementById('box-photo-btn').style.display='none';
-  const b64=await toB64(file);
+
+  // 이미지 리사이즈 (API 전송 크기 제한 대비)
+  let b64, mime;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',max_tokens:400,
-        messages:[{role:'user',content:[
-          {type:'image',source:{type:'base64',media_type:file.type,data:b64}},
-          {type:'text',text:`이 의약품 박스/용기 사진에서 다음 정보를 찾아 JSON만 응답 (마크다운 없이):
-{"name":"약품명(상품명+용량+제형)","expiry":"YYYY-MM-DD 형식 사용기한","lot":"제조번호/LOT번호","serial":"(21)로 표시된 일련번호"}
-없는 정보는 빈 문자열. 사용기한은 YY.MM.DD, YYYY.MM.DD, YYYYMMDD 등 다양한 형식 가능.`}
-        ]}]
-      })
+    const resized = await resizeImage(file, 1200);
+    b64 = resized.b64;
+    mime = resized.mime;
+  }catch(e){
+    b64 = await toB64(file);
+    mime = file.type || 'image/jpeg';
+  }
+
+  try{
+    const body = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mime, data: b64 }
+          },
+          {
+            type: 'text',
+            text: '이 의약품 박스/용기 사진에서 정보를 읽어주세요.\n\n반드시 JSON 형식으로만 응답하세요:\n{"name":"약품명(상품명+용량+제형, 없으면 빈문자열)","expiry":"사용기한(YYYY-MM-DD 형식으로 변환, 없으면 빈문자열)","lot":"제조번호 또는 LOT번호(없으면 빈문자열)","serial":"일련번호(없으면 빈문자열)"}\n\n사용기한은 28.07.30, 2028.07.30, 20280730 등 다양한 형식으로 표시될 수 있으니 YYYY-MM-DD로 변환해주세요.'
+          }
+        ]
+      }]
+    };
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
-    const data=await res.json();
-    const txt=(data.content?.[0]?.text||'').replace(/\`\`\`json|\`\`\`/g,'').trim();
-    let p=null; try{p=JSON.parse(txt);}catch(e){}
+
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error(`API ${res.status}: ${errText.slice(0,100)}`);
+    }
+
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+    // JSON 추출 (```json ... ``` 또는 그냥 {...})
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    let p = null;
+    if(jsonMatch){ try{ p = JSON.parse(jsonMatch[0]); }catch(e){} }
+
     document.getElementById('box-loading').style.display='none';
+
     if(p){
       showFinal({
-        name:p.name||'',
-        expiry:p.expiry?parseExpiry(p.expiry):(qrParsed?.expiry||''),
-        lot:p.lot||qrParsed?.lot||'',
-        serial:p.serial||qrParsed?.serial||'',
+        name: p.name || '',
+        expiry: p.expiry ? parseExpiry(p.expiry) : (qrParsed?.expiry||''),
+        lot: p.lot || qrParsed?.lot || '',
+        serial: p.serial || qrParsed?.serial || '',
       });
-    }else{
-      showFinal({name:'',expiry:qrParsed?.expiry||'',lot:qrParsed?.lot||'',serial:qrParsed?.serial||''});
+    } else {
+      showFinal({name:'', expiry:qrParsed?.expiry||'', lot:qrParsed?.lot||'', serial:qrParsed?.serial||''});
       toast('자동 인식 실패 — 직접 입력해주세요');
     }
-  }catch(err){
+  } catch(err){
+    console.error('handleBoxPhoto error:', err);
     document.getElementById('box-loading').style.display='none';
-    showFinal({name:'',expiry:qrParsed?.expiry||'',lot:qrParsed?.lot||'',serial:qrParsed?.serial||''});
-    toast('오류 발생 — 직접 입력해주세요');
+    showFinal({name:'', expiry:qrParsed?.expiry||'', lot:qrParsed?.lot||'', serial:qrParsed?.serial||''});
+    toast('인식 오류 — 직접 입력해주세요 (' + (err.message||'').slice(0,30) + ')');
   }
+}
+
+// 이미지 리사이즈 (큰 사진 압축)
+function resizeImage(file, maxWidth){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const imgEl = new Image();
+      imgEl.onload = () => {
+        const scale = Math.min(1, maxWidth / imgEl.width);
+        const w = Math.round(imgEl.width * scale);
+        const h = Math.round(imgEl.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ b64: dataUrl.split(',')[1], mime: 'image/jpeg' });
+      };
+      imgEl.onerror = reject;
+      imgEl.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function showFinal(info){

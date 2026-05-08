@@ -1,250 +1,780 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ReturnRx - 약국 반품 앱</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="manifest" href="manifest.json">
-  <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
-    .scan-box { border: 3px dashed #3b82f6; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ReturnRx</title>
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ReturnRx">
+<meta name="theme-color" content="#2563EB">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#F2F4F7;--surface:#fff;--primary:#2563EB;--pd:#1D4ED8;--pl:#EFF6FF;--text:#111827;--muted:#6B7280;--border:#E5E7EB;--ok:#059669;--okl:#ECFDF5;--danger:#DC2626;--dangerl:#FEF2F2;--warn:#D97706;--warnl:#FFFBEB;--r:16px;--rs:10px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif;max-width:430px;margin:0 auto;min-height:100vh}
+
+/* NAV */
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);z-index:100;padding-bottom:env(safe-area-inset-bottom,12px)}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:11px 0 9px;border:none;background:none;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer}
+.nav-item.on{color:var(--primary)}
+.nav-item svg{width:23px;height:23px}
+
+.screen{display:none;padding-bottom:90px;min-height:100vh}
+.screen.on{display:block}
+.hd{background:var(--surface);padding:16px 20px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.hd-title{font-size:19px;font-weight:800;letter-spacing:-.03em}
+.hd-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.sec{margin:12px 16px 0}
+.sec-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.card{background:var(--surface);border-radius:var(--r);overflow:hidden}
+
+/* 계수기 */
+.upload-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:180px;gap:10px;cursor:pointer;position:relative;border:2px dashed var(--border);border-radius:var(--r);background:var(--surface)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{width:52px;height:52px;background:var(--pl);border-radius:14px;display:flex;align-items:center;justify-content:center}
+.upload-icon svg{width:26px;height:26px;color:var(--primary)}
+.upload-text{font-size:14px;font-weight:600}
+.upload-sub{font-size:12px;color:var(--muted);text-align:center;padding:0 24px}
+.img-canvas-wrap{position:relative;background:#111;border-radius:var(--r) var(--r) 0 0;overflow:hidden}
+.img-canvas-wrap img{width:100%;display:block;max-height:300px;object-fit:contain}
+.img-canvas-wrap canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.result-bar{background:var(--text);padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
+.result-count{font-size:36px;font-weight:800;color:#fff;letter-spacing:-.03em}
+.result-unit{font-size:12px;color:rgba(255,255,255,.5);margin-top:1px}
+.result-badge{font-size:12px;font-weight:700;padding:5px 12px;border-radius:99px}
+.b-ok{background:#059669;color:#fff}
+.b-warn{background:var(--warn);color:#fff}
+.b-err{background:var(--danger);color:#fff}
+.count-detail{padding:10px 16px 12px;font-size:13px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border)}
+.loading-box{padding:20px 18px;display:flex;align-items:center;gap:12px}
+.dots{display:flex;gap:5px}
+.dots span{width:8px;height:8px;background:var(--primary);border-radius:50%;animation:ld .9s infinite;display:inline-block}
+.dots span:nth-child(2){animation-delay:.15s}
+.dots span:nth-child(3){animation-delay:.3s}
+@keyframes ld{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
+.loading-text{font-size:13px;color:var(--muted);line-height:1.5}
+.btn-retake{width:100%;padding:12px;background:var(--bg);border:none;border-top:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.tips{margin:10px 16px 0;background:var(--pl);border-radius:var(--rs);padding:12px 14px}
+.tips-t{font-size:12px;font-weight:700;color:var(--primary);margin-bottom:5px}
+.tips-l{font-size:12px;color:#1e40af;line-height:1.8}
+
+/* 반품 폼 */
+.field{padding:12px 16px;border-bottom:1px solid var(--border)}
+.field:last-child{border-bottom:none}
+.field-label{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.field-input{width:100%;border:none;outline:none;font-size:15px;font-family:inherit;color:var(--text);background:transparent;padding:0}
+.field-input::placeholder{color:#D1D5DB}
+.field-row{display:grid;grid-template-columns:1fr 1fr}
+.field-row .field{border-bottom:none}
+.field-row .field:first-child{border-right:1px solid var(--border)}
+.unit-sel{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)}
+.unit-btn{padding:10px;border:2px solid var(--border);border-radius:var(--rs);background:var(--surface);font-size:13px;font-weight:700;cursor:pointer;text-align:center;color:var(--muted);transition:all .15s}
+.unit-btn.on{border-color:var(--primary);background:var(--pl);color:var(--primary)}
+.btn-add{display:flex;align-items:center;justify-content:center;gap:6px;margin:10px 16px;padding:11px;background:var(--primary);color:#fff;border:none;border-radius:var(--rs);font-size:14px;font-weight:700;cursor:pointer;width:calc(100% - 32px)}
+.btn-add:active{background:var(--pd)}
+.item-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.item-row:last-child{border-bottom:none}
+.item-num{width:26px;height:26px;background:var(--pl);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--primary);flex-shrink:0}
+.item-info{flex:1;min-width:0}
+.item-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-meta{font-size:11px;color:var(--muted);margin-top:1px}
+.item-del{background:none;border:none;padding:5px;cursor:pointer;color:var(--muted);flex-shrink:0}
+.empty-state{padding:36px 20px;text-align:center;color:var(--muted);font-size:14px}
+.bq{display:inline-block;background:var(--text);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;margin-left:5px}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 12px}
+.btn-half{display:flex;align-items:center;justify-content:center;gap:6px;padding:13px;border:none;border-radius:var(--rs);font-size:14px;font-weight:700;cursor:pointer}
+.btn-half:active{transform:scale(.98)}
+.btn-excel{background:var(--okl);color:var(--ok)}
+.btn-mail{background:var(--pl);color:var(--primary)}
+
+/* QR */
+.cam-wrap{position:relative;background:#000;border-radius:var(--r);overflow:hidden;min-height:260px;display:flex;align-items:center;justify-content:center}
+.cam-wrap video{width:100%;display:block}
+.cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.qr-frame{width:210px;height:210px;position:relative}
+.qr-frame::before{content:'';position:absolute;inset:0;border:1.5px solid rgba(255,255,255,.2);border-radius:12px}
+.qr-corner{position:absolute;width:26px;height:26px;border-color:#fff;border-style:solid}
+.qr-corner.tl{top:-1px;left:-1px;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
+.qr-corner.tr{top:-1px;right:-1px;border-width:3px 3px 0 0;border-radius:0 8px 0 0}
+.qr-corner.bl{bottom:-1px;left:-1px;border-width:0 0 3px 3px;border-radius:0 0 0 8px}
+.qr-corner.br{bottom:-1px;right:-1px;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+.cam-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:5px 14px;border-radius:99px;white-space:nowrap}
+.cam-ph{display:flex;flex-direction:column;align-items:center;gap:10px;color:rgba(255,255,255,.45);font-size:13px;text-align:center;padding:20px}
+.btn-scan{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 32px);margin:10px 16px;padding:14px;background:var(--text);color:#fff;border:none;border-radius:var(--rs);font-size:15px;font-weight:700;cursor:pointer}
+
+/* QR 결과 패널 */
+.qr-panel{margin:0 16px;border-radius:var(--rs);overflow:hidden;display:none}
+.qr-panel.on{display:block}
+
+/* 단계별 상태 표시 */
+.step-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px}
+.step-row:last-child{border-bottom:none}
+.step-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+.step-icon.done{background:var(--okl);color:var(--ok)}
+.step-icon.loading{background:var(--pl);color:var(--primary)}
+.step-icon.fail{background:var(--dangerl);color:var(--danger)}
+.step-icon.idle{background:var(--bg);color:var(--muted)}
+.step-info{flex:1}
+.step-title{font-weight:700;font-size:13px}
+.step-desc{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* 인식 결과 카드 */
+.result-card{background:var(--okl);padding:14px;border-top:1px solid #D1FAE5}
+.result-card-title{font-size:12px;font-weight:700;color:var(--ok);margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.result-field{display:flex;align-items:baseline;gap:6px;margin-bottom:5px}
+.result-field:last-child{margin-bottom:0}
+.rf-label{font-size:11px;color:#065F46;font-weight:700;min-width:56px}
+.rf-value{font-size:13px;color:#064E3B;font-weight:600;word-break:break-all}
+
+/* 이름 입력 */
+.name-box{background:var(--warnl);padding:14px;border-top:1px solid #FDE68A;display:none}
+.name-box.on{display:block}
+.name-label{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px}
+.name-input{width:100%;border:1.5px solid #FCD34D;border-radius:8px;padding:10px 12px;font-size:15px;font-family:inherit;background:#fff;outline:none}
+.name-input:focus{border-color:var(--warn)}
+.btn-name-save{width:100%;margin-top:8px;padding:12px;background:var(--warn);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
+
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:99px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:opacity .2s;white-space:nowrap;max-width:90vw;text-align:center;pointer-events:none}
+.toast.on{opacity:1}
+</style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-  <div class="max-w-lg mx-auto bg-white min-h-screen shadow-2xl overflow-hidden">
-    <!-- 헤더 -->
-    <div class="bg-blue-600 text-white p-5 flex justify-between items-center">
-      <h1 class="text-3xl font-bold">ReturnRx</h1>
-      <div class="flex gap-3">
-        <button onclick="exportExcel()" class="bg-white text-blue-600 px-5 py-2 rounded-2xl text-sm font-semibold">엑셀</button>
-        <button onclick="sendEmail()" class="bg-white text-blue-600 px-5 py-2 rounded-2xl text-sm font-semibold">메일</button>
+<body>
+<div class="toast" id="toast"></div>
+
+<!-- ══ 계수기 ══ -->
+<div class="screen on" id="s-counter">
+  <div class="hd">
+    <div class="hd-title">📦 의약품 계수기</div>
+    <div class="hd-sub">사진을 찍으면 AI가 알약에 번호를 붙여 셉니다</div>
+  </div>
+  <div class="sec">
+    <div id="upload-area">
+      <label class="upload-zone">
+        <input type="file" accept="image/*" capture="environment" onchange="handleCounter(event)">
+        <div class="upload-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+        <div class="upload-text">사진 촬영 / 갤러리 선택</div>
+        <div class="upload-sub">알약을 흰 바닥에 펼쳐서 위에서 찍어주세요</div>
+      </label>
+    </div>
+    <div id="counter-result" style="display:none;">
+      <div class="card">
+        <div class="img-canvas-wrap">
+          <img id="counter-img" alt="">
+          <canvas id="counter-canvas"></canvas>
+        </div>
+        <div id="loading-box" class="loading-box">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="loading-text">AI가 알약을 인식하는 중...</div>
+        </div>
+        <div id="result-box" style="display:none;">
+          <div class="result-bar">
+            <div>
+              <div class="result-count" id="count-num">—</div>
+              <div class="result-unit" id="count-unit">개 인식됨</div>
+            </div>
+            <div class="result-badge" id="count-badge">완료</div>
+          </div>
+          <div class="count-detail" id="count-detail"></div>
+        </div>
+        <button class="btn-retake" onclick="resetCounter()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.86"/></svg>
+          다시 찍기
+        </button>
       </div>
     </div>
+  </div>
+  <div class="tips">
+    <div class="tips-t">📸 정확하게 찍는 방법</div>
+    <div class="tips-l">· 흰 종이/트레이 위에 알약을 펼쳐주세요<br>· 겹치지 않게 간격을 두세요<br>· 밝은 곳에서 수직으로 찍어주세요<br>· 많으면 나눠서 여러 번 찍으세요</div>
+  </div>
+</div>
 
-    <!-- 탭 -->
-    <div class="grid grid-cols-3 border-b">
-      <button onclick="switchTab(0)" class="tab-btn py-4 text-center font-medium border-b-4 border-blue-600 text-blue-600" id="tab0-btn">📷 QR 스캔</button>
-      <button onclick="switchTab(1)" class="tab-btn py-4 text-center font-medium" id="tab1-btn">📋 반품 목록</button>
-      <button onclick="switchTab(2)" class="tab-btn py-4 text-center font-medium" id="tab2-btn">📊 계수기</button>
+<!-- ══ 반품 목록 ══ -->
+<div class="screen" id="s-list">
+  <div class="hd">
+    <div class="hd-title">📋 반품 목록</div>
+    <div class="hd-sub">정보 입력 후 엑셀/이메일로 보내세요</div>
+  </div>
+  <div class="sec">
+    <div class="sec-label">새 항목 추가</div>
+    <div class="card">
+      <div class="field">
+        <div class="field-label">의약품명</div>
+        <input class="field-input" id="f-name" type="text" placeholder="예: 타이레놀 500mg 60정">
+      </div>
+      <div class="unit-sel">
+        <button class="unit-btn on" id="unit-box" onclick="selectUnit('box')">📦 완통 (박스)</button>
+        <button class="unit-btn" id="unit-pill" onclick="selectUnit('pill')">💊 낱알</button>
+      </div>
+      <div class="field">
+        <div class="field-label" id="qty-label">수량 (박스)</div>
+        <input class="field-input" id="f-qty" type="number" placeholder="1" min="1" inputmode="numeric">
+      </div>
+      <div class="field">
+        <div class="field-label">유통기한 (YYYYMMDD)</div>
+        <input class="field-input" id="f-expiry" type="text" placeholder="예: 20261231" inputmode="numeric" maxlength="10">
+      </div>
+      <div class="field-row">
+        <div class="field" style="border-bottom:none;">
+          <div class="field-label">로트번호</div>
+          <input class="field-input" id="f-lot" type="text" placeholder="Lot No.">
+        </div>
+        <div class="field" style="border-bottom:none;">
+          <div class="field-label">일련번호</div>
+          <input class="field-input" id="f-serial" type="text" placeholder="Serial No.">
+        </div>
+      </div>
     </div>
-
-    <!-- QR 스캔 탭 -->
-    <div id="tab0" class="tab-content active p-4">
-      <div id="qr-reader" class="scan-box w-full aspect-square rounded-3xl overflow-hidden mx-auto"></div>
-      <p class="text-center text-sm text-gray-500 mt-4">의약품 QR코드(박스·통)를 카메라에 비춰주세요</p>
+  </div>
+  <button class="btn-add" onclick="addItem()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    목록에 추가
+  </button>
+  <div class="sec" style="margin-top:4px;">
+    <div class="sec-label">
+      <span>추가된 항목 <span id="item-count-badge" class="bq">0</span></span>
+      <span id="clear-btn" onclick="clearAll()" style="color:var(--danger);font-size:11px;font-weight:700;cursor:pointer;display:none;">전체 삭제</span>
     </div>
-
-    <!-- 반품 목록 탭 -->
-    <div id="tab1" class="tab-content p-4">
-      <div id="list" class="space-y-3 min-h-[400px]"></div>
-      <button onclick="addManualItem()" class="w-full mt-6 py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-3xl text-lg font-medium flex items-center justify-center gap-2">
-        <span class="text-2xl">+</span> 직접 입력 추가
+    <div class="card" id="item-list"><div class="empty-state">아직 추가된 항목이 없습니다</div></div>
+  </div>
+  <div class="sec" style="margin-top:10px;">
+    <div class="btn-row">
+      <button class="btn-half btn-excel" onclick="exportExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        엑셀 저장
+      </button>
+      <button class="btn-half btn-mail" onclick="sendEmail()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        이메일 발송
       </button>
     </div>
+  </div>
+</div>
 
-    <!-- 계수기 탭 -->
-    <div id="tab2" class="tab-content p-4">
-      <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" onchange="countPills(this)">
-      <button onclick="document.getElementById('photoInput').click()" class="w-full py-20 border-4 border-dashed border-gray-300 rounded-3xl text-center hover:border-blue-400">
-        <div class="text-6xl mb-4">📸</div>
-        <p class="text-xl font-semibold">알약 사진 찍기</p>
-        <p class="text-sm text-gray-500 mt-2">낱알 개수 자동 인식</p>
-      </button>
-      <div id="count-result" class="mt-8 text-center"></div>
-    </div>
-
-    <!-- 하단 상태 -->
-    <div class="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white border-t text-xs text-gray-400 text-center py-3">
-      ReturnRx v5.1 • QR 파싱 강화됨
+<!-- ══ QR 스캔 ══ -->
+<div class="screen" id="s-qr">
+  <div class="hd">
+    <div class="hd-title">🔍 QR 스캔</div>
+    <div class="hd-sub">약 박스 QR → 약품 정보 자동 인식</div>
+  </div>
+  <div class="sec">
+    <div class="card">
+      <div class="cam-wrap">
+        <div class="cam-ph" id="cam-ph">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
+          카메라 시작 버튼을 눌러주세요
+        </div>
+        <video id="qr-video" autoplay playsinline muted style="display:none;width:100%;"></video>
+        <canvas id="qr-canvas" style="display:none;"></canvas>
+        <div class="cam-overlay" id="cam-overlay" style="display:none;">
+          <div class="qr-frame">
+            <div class="qr-corner tl"></div><div class="qr-corner tr"></div>
+            <div class="qr-corner bl"></div><div class="qr-corner br"></div>
+          </div>
+        </div>
+        <div class="cam-hint" id="cam-hint" style="display:none;">약 박스의 QR코드를 네모 안에 맞춰주세요</div>
+      </div>
     </div>
   </div>
 
-  <script>
-    // ================== 전역 변수 ==================
-    let items = JSON.parse(localStorage.getItem('returnItems')) || [];
-    let html5QrCode;
+  <button class="btn-scan" id="scan-btn" onclick="toggleCamera()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
+    카메라 시작
+  </button>
 
-    // ================== GS1 파싱 (국내 의약품 완벽 지원) ==================
-    function parseGS1(rawData) {
-      const result = { gtin: '', expiry: '', lot: '', serial: '', name: '' };
+  <!-- 진행 패널 -->
+  <div class="qr-panel card" id="qr-panel">
+    <!-- 1단계: QR 파싱 -->
+    <div class="step-row" id="step1-row">
+      <div class="step-icon idle" id="step1-icon">1</div>
+      <div class="step-info">
+        <div class="step-title" id="step1-title">QR 데이터 읽기</div>
+        <div class="step-desc" id="step1-desc">스캔 대기 중</div>
+      </div>
+    </div>
+    <!-- 2단계: AI 분석 -->
+    <div class="step-row" id="step2-row">
+      <div class="step-icon idle" id="step2-icon">2</div>
+      <div class="step-info">
+        <div class="step-title" id="step2-title">AI 약품 정보 분석</div>
+        <div class="step-desc" id="step2-desc">QR 인식 후 시작됩니다</div>
+      </div>
+    </div>
+    <!-- 결과 -->
+    <div class="result-card" id="result-card" style="display:none;">
+      <div class="result-card-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        인식된 정보
+      </div>
+      <div id="result-fields"></div>
+    </div>
+    <!-- 이름 입력 -->
+    <div class="name-box" id="name-box">
+      <div class="name-label" id="name-label">✏️ 의약품명을 입력해주세요</div>
+      <input class="name-input" id="name-input" type="text" placeholder="예: 타이레놀 500mg 60정">
+      <button class="btn-name-save" onclick="saveQrItem()">반품 목록에 추가 →</button>
+    </div>
+  </div>
 
-      // 1. 괄호 있는 형식 처리 (01)123...(17)261231(10)로트(21)일련
-      let data = rawData.replace(/\(/g, '').replace(/\)/g, '').replace(/[^0-9A-Za-z]/g, '');
+  <div class="sec" style="margin-top:10px;">
+    <div class="card" style="padding:13px 16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;">💡 스캔 안내</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        · 약 박스 옆면의 <strong>작은 QR/바코드</strong>를 스캔하세요<br>
+        · 인식되면 AI가 약 이름·유통기한·로트·일련번호를 자동 분석합니다<br>
+        · 약 이름 확인 후 목록에 추가하면 완료입니다
+      </div>
+    </div>
+  </div>
+</div>
 
-      // GTIN (01 + 14자리)
-      let match = data.match(/01(\d{14})/);
-      if (match) result.gtin = match[1];
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-item on" onclick="go('counter',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>계수기
+  </button>
+  <button class="nav-item" onclick="go('list',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>반품 목록
+  </button>
+  <button class="nav-item" onclick="go('qr',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>QR 스캔
+  </button>
+</nav>
 
-      // 유통기한 (17 + 6자리 YYMMDD)
-      match = data.match(/17(\d{6})/);
-      if (match) {
-        const exp = match[1];
-        const year = '20' + exp.substring(0, 2);
-        const month = exp.substring(2, 4);
-        const day = exp.substring(4, 6);
-        result.expiry = `${year}-${month}-${d}`;
+<script>
+const RF_KEY = 'D5tgTdayef5RWAWju8RK';
+const RF_MODEL = 'pills-sxdht';
+const RF_VER = '1';
+
+let items = JSON.parse(localStorage.getItem('rx_items')||'[]');
+let camStream=null, scanning=false, currentUnit='box', pendingQr=null;
+
+// ── Nav ──
+function go(id,btn){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));
+  document.getElementById('s-'+id).classList.add('on');
+  btn.classList.add('on');
+  if(id!=='qr')stopCamera();
+  if(id==='list')renderList();
+}
+
+// ══ 계수기 ══
+async function handleCounter(e){
+  const file=e.target.files[0]; if(!file)return; e.target.value='';
+  document.getElementById('upload-area').style.display='none';
+  document.getElementById('counter-result').style.display='block';
+  document.getElementById('loading-box').style.display='flex';
+  document.getElementById('result-box').style.display='none';
+  const img=document.getElementById('counter-img');
+  img.onload=setupCanvas;
+  img.src=URL.createObjectURL(file);
+  const b64=await toB64(file);
+  await runRoboflow(b64);
+}
+
+function setupCanvas(){
+  const img=document.getElementById('counter-img');
+  const c=document.getElementById('counter-canvas');
+  c.width=img.naturalWidth; c.height=img.naturalHeight;
+}
+
+async function runRoboflow(b64){
+  try{
+    const res=await fetch(`https://detect.roboflow.com/${RF_MODEL}/${RF_VER}?api_key=${RF_KEY}&confidence=30&overlap=50`,{
+      method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b64
+    });
+    const data=await res.json();
+    document.getElementById('loading-box').style.display='none';
+    document.getElementById('result-box').style.display='block';
+    if(data.predictions!==undefined){
+      const count=data.predictions.length;
+      drawBoxes(data.predictions,data.image);
+      document.getElementById('count-num').textContent=count;
+      document.getElementById('count-unit').textContent='개 인식됨';
+      if(count===0){
+        document.getElementById('count-badge').className='result-badge b-warn';
+        document.getElementById('count-badge').textContent='인식 안됨';
+        document.getElementById('count-detail').textContent='알약이 인식되지 않았습니다.\n흰 배경 위에 겹치지 않게 펼쳐서 다시 찍어주세요.';
+      }else{
+        const conf=Math.round(data.predictions.reduce((s,p)=>s+p.confidence,0)/count*100);
+        document.getElementById('count-badge').className='result-badge '+(conf>=65?'b-ok':'b-warn');
+        document.getElementById('count-badge').textContent=`신뢰도 ${conf}%`;
+        document.getElementById('count-detail').textContent=`${count}개 알약을 인식했습니다. 각 알약에 번호가 표시됩니다.\n인식이 불정확하면 나눠서 다시 찍어주세요.`;
       }
-
-      // 로트번호 (10 + 알파벳/숫자)
-      match = data.match(/10([A-Za-z0-9]+)/);
-      if (match) result.lot = match[1];
-
-      // 일련번호 (21 + 알파벳/숫자)
-      match = data.match(/21([A-Za-z0-9]+)/);
-      if (match) result.serial = match[1];
-
-      return result;
+    }else{
+      showCountErr('API 오류가 발생했습니다. 다시 시도해주세요.');
     }
+  }catch(err){
+    showCountErr('네트워크 오류입니다. 인터넷 연결을 확인해주세요.');
+  }
+}
 
-    // ================== QR 스캔 ==================
-    function startQR() {
-      const reader = document.getElementById('qr-reader');
-      if (html5QrCode) html5QrCode.clear();
-      html5QrCode = new Html5Qrcode("qr-reader");
-      
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 280, height: 280 } },
-        (decodedText) => {
-          html5QrCode.stop();
-          const parsed = parseGS1(decodedText);
-          
-          items.unshift({
-            id: Date.now(),
-            unit: '낱알',
-            qty: 1,
-            name: '직접 입력하세요',
-            lot: parsed.lot || '',
-            expiry: parsed.expiry || '',
-            serial: parsed.serial || '',
-            gtin: parsed.gtin || ''
-          });
-          saveItems();
-          renderList();
-          switchTab(1);
-          alert(`✅ QR 인식 완료!\n유통기한: ${parsed.expiry || '없음'}\n로트: ${parsed.lot || '없음'}\n일련: ${parsed.serial || '없음'}`);
-        },
-        (error) => {}
-      ).catch(err => console.log(err));
-    }
+function drawBoxes(preds,imgInfo){
+  const img=document.getElementById('counter-img');
+  const c=document.getElementById('counter-canvas');
+  const ctx=c.getContext('2d');
+  const w=imgInfo?.width||img.naturalWidth;
+  const h=imgInfo?.height||img.naturalHeight;
+  c.width=w; c.height=h;
+  const fs=Math.max(14,w/40);
+  preds.forEach((p,i)=>{
+    const x=p.x-p.width/2, y=p.y-p.height/2;
+    ctx.strokeStyle='rgba(37,99,235,.9)'; ctx.lineWidth=Math.max(2,w/200);
+    ctx.strokeRect(x,y,p.width,p.height);
+    const pad=fs*.4, nw=fs+pad*2;
+    ctx.fillStyle='rgba(37,99,235,.9)';
+    ctx.beginPath(); ctx.roundRect(x,y-fs-pad*2,nw,fs+pad*2,4); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font=`bold ${fs}px sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(i+1,x+nw/2,y-fs/2-pad);
+  });
+}
 
-    // ================== 나머지 함수들 (변경 없음) ==================
-    function renderList() {
-      const container = document.getElementById('list');
-      container.innerHTML = items.map((item, idx) => `
-        <div class="bg-gray-50 border border-gray-200 rounded-3xl p-4 flex gap-4">
-          <div class="flex-1">
-            <div class="flex justify-between">
-              <span class="font-semibold">${item.name}</span>
-              <span class="text-xs bg-white px-3 py-1 rounded-2xl">${item.unit} ${item.qty}</span>
-            </div>
-            <div class="text-xs text-gray-500 mt-1">
-              유통기한: ${item.expiry || '-'}<br>
-              로트: ${item.lot || '-'}<br>
-              일련번호: ${item.serial || '-'}
-            </div>
-          </div>
-          <button onclick="deleteItem(${idx})" class="text-red-500 text-3xl leading-none">×</button>
-        </div>
-      `).join('');
-    }
+function showCountErr(msg){
+  document.getElementById('loading-box').style.display='none';
+  document.getElementById('result-box').style.display='block';
+  document.getElementById('count-num').textContent='!';
+  document.getElementById('count-unit').textContent='오류';
+  document.getElementById('count-badge').className='result-badge b-err';
+  document.getElementById('count-badge').textContent='오류';
+  document.getElementById('count-detail').textContent=msg;
+}
 
-    function saveItems() {
-      localStorage.setItem('returnItems', JSON.stringify(items));
-    }
+function resetCounter(){
+  document.getElementById('upload-area').style.display='block';
+  document.getElementById('counter-result').style.display='none';
+}
 
-    function addManualItem() {
-      const name = prompt('의약품명', '');
-      if (!name) return;
-      const unit = confirm('완통(박스)입니까? 확인=완통, 취소=낱알') ? '완통' : '낱알';
-      const qty = parseInt(prompt('수량', '1')) || 1;
-      const expiry = prompt('유통기한 (YYYY-MM-DD)', '');
-      const lot = prompt('로트번호', '');
-      const serial = prompt('일련번호', '');
+// ══ 단위 선택 ══
+function selectUnit(u){
+  currentUnit=u;
+  document.getElementById('unit-box').classList.toggle('on',u==='box');
+  document.getElementById('unit-pill').classList.toggle('on',u==='pill');
+  document.getElementById('qty-label').textContent=u==='box'?'수량 (박스)':'수량 (낱알 개수)';
+  document.getElementById('f-qty').placeholder=u==='box'?'1':'예: 30';
+}
 
-      items.unshift({ id: Date.now(), unit, qty, name, lot, expiry, serial, gtin: '' });
-      saveItems();
-      renderList();
-    }
+// ══ 유통기한 파싱 ══
+function parseExpiry(raw){
+  if(!raw)return'';
+  const s=raw.replace(/[^0-9]/g,'');
+  if(s.length===8)return`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+  if(s.length===6)return`20${s.slice(0,2)}-${s.slice(2,4)}-${s.slice(4,6)}`;
+  const m=raw.match(/(\d{4})[^\d](\d{2})[^\d](\d{2})/);
+  if(m)return`${m[1]}-${m[2]}-${m[3]}`;
+  return raw;
+}
 
-    window.deleteItem = function(idx) {
-      if (confirm('삭제하시겠습니까?')) {
-        items.splice(idx, 1);
-        saveItems();
-        renderList();
+// ══ 반품 목록 ══
+function saveItems(){localStorage.setItem('rx_items',JSON.stringify(items));}
+
+function addItem(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){toast('의약품명을 입력해주세요');return;}
+  items.push({id:Date.now(),name,unit:currentUnit,
+    expiry:parseExpiry(document.getElementById('f-expiry').value.trim()),
+    qty:parseInt(document.getElementById('f-qty').value)||1,
+    lot:document.getElementById('f-lot').value.trim(),
+    serial:document.getElementById('f-serial').value.trim()
+  });
+  saveItems();
+  ['f-name','f-expiry','f-qty','f-lot','f-serial'].forEach(id=>document.getElementById(id).value='');
+  renderList(); toast('✅ 추가되었습니다');
+}
+
+function removeItem(id){items=items.filter(i=>i.id!==id);saveItems();renderList();}
+function clearAll(){if(!confirm('전체 삭제?'))return;items=[];saveItems();renderList();}
+
+function renderList(){
+  document.getElementById('item-count-badge').textContent=items.length;
+  document.getElementById('clear-btn').style.display=items.length>0?'block':'none';
+  const el=document.getElementById('item-list');
+  if(items.length===0){el.innerHTML='<div class="empty-state">아직 추가된 항목이 없습니다</div>';return;}
+  el.innerHTML=items.map((item,i)=>{
+    const u=item.unit==='pill'?`낱알 ${item.qty}개`:`${item.qty}박스`;
+    return`<div class="item-row">
+      <div class="item-num">${i+1}</div>
+      <div class="item-info">
+        <div class="item-name">${item.name}</div>
+        <div class="item-meta">${u}${item.expiry?` · ${item.expiry}`:''}${item.lot?` · LOT ${item.lot}`:''}</div>
+      </div>
+      <button class="item-del" onclick="removeItem(${item.id})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function exportExcel(){
+  if(items.length===0){toast('추가된 항목이 없습니다');return;}
+  const wb=XLSX.utils.book_new();
+  const today=new Date().toLocaleDateString('ko-KR');
+  const rows=[['의약품 반품 신청서'],['작성일:',today,'','약국명:',''],[''],
+    ['번호','의약품명','유통기한','단위','수량','로트번호','일련번호','반품사유']];
+  items.forEach((item,i)=>rows.push([i+1,item.name,item.expiry||'',
+    item.unit==='pill'?'낱알':'박스(완통)',item.qty,item.lot||'',item.serial||'','유통기한 만료/임박']));
+  rows.push([''],['합계:',`${items.length}품목`]);
+  rows.push([''],['담당자 서명:','','','확인자 서명:','']);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[4,32,13,8,8,18,18,16].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,'반품신청서');
+  XLSX.writeFile(wb,`반품신청서_${today.replace(/[\.\s]/g,'')}.xlsx`);
+  toast('📥 엑셀 저장됐습니다');
+}
+
+function sendEmail(){
+  if(items.length===0){toast('추가된 항목이 없습니다');return;}
+  const today=new Date().toLocaleDateString('ko-KR');
+  const lines=items.map((item,i)=>{
+    const u=item.unit==='pill'?`낱알 ${item.qty}개`:`${item.qty}박스`;
+    return`${i+1}. ${item.name}\n   유통기한: ${item.expiry||'-'} | 수량: ${u} | LOT: ${item.lot||'-'} | S/N: ${item.serial||'-'}`;
+  }).join('\n');
+  window.location.href=`mailto:?subject=${encodeURIComponent(`[반품 신청] ${today}`)}&body=${encodeURIComponent(`안녕하세요,\n\n아래 의약품 반품을 요청드립니다.\n\n${lines}\n\n총 ${items.length}품목\n\n감사합니다.`)}`;
+  toast('이메일 앱을 열고 있습니다...');
+}
+
+// ══ QR 스캔 ══
+function setStep(num, state, title, desc){
+  const icon=document.getElementById(`step${num}-icon`);
+  const t=document.getElementById(`step${num}-title`);
+  const d=document.getElementById(`step${num}-desc`);
+  icon.className='step-icon '+state;
+  icon.innerHTML = state==='done'?'✓': state==='loading'?'<div class="dots" style="gap:3px"><span style="width:5px;height:5px"></span><span style="width:5px;height:5px"></span><span style="width:5px;height:5px"></span></div>': state==='fail'?'✕': num;
+  if(title)t.textContent=title;
+  if(desc)d.textContent=desc;
+}
+
+async function toggleCamera(){
+  if(camStream){stopCamera();return;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920}}});
+    camStream=stream; scanning=true;
+    const video=document.getElementById('qr-video');
+    video.srcObject=stream; video.style.display='block';
+    document.getElementById('cam-ph').style.display='none';
+    document.getElementById('cam-overlay').style.display='flex';
+    document.getElementById('cam-hint').style.display='block';
+    document.getElementById('scan-btn').textContent='⏹ 카메라 중지';
+    // 패널 초기화
+    document.getElementById('qr-panel').classList.add('on');
+    document.getElementById('result-card').style.display='none';
+    document.getElementById('name-box').classList.remove('on');
+    setStep(1,'idle','QR 데이터 읽기','QR코드를 네모 안에 맞춰주세요');
+    setStep(2,'idle','AI 약품 정보 분석','QR 인식 후 시작됩니다');
+    video.onloadedmetadata=()=>qrLoop();
+    toast('약 박스 QR코드를 네모 안에 맞춰주세요');
+  }catch(e){toast('카메라 권한이 필요합니다');}
+}
+
+function stopCamera(){
+  scanning=false;
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  document.getElementById('qr-video').style.display='none';
+  document.getElementById('cam-ph').style.display='flex';
+  document.getElementById('cam-overlay').style.display='none';
+  document.getElementById('cam-hint').style.display='none';
+  document.getElementById('scan-btn').innerHTML=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg> 카메라 시작`;
+}
+
+async function qrLoop(){
+  if(!scanning||!camStream)return;
+  const video=document.getElementById('qr-video');
+  const canvas=document.getElementById('qr-canvas');
+  if(video.readyState<2){setTimeout(qrLoop,300);return;}
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  if('BarcodeDetector' in window){
+    try{
+      const det=new BarcodeDetector({formats:['qr_code','data_matrix','code_128','ean_13','ean_8','code_39','pdf417']});
+      const codes=await det.detect(canvas);
+      if(codes.length>0){
+        stopCamera();
+        await processQR(codes[0].rawValue, codes[0].format);
+        return;
       }
-    };
+    }catch(e){}
+  }
+  setTimeout(qrLoop,350);
+}
 
-    window.exportExcel = function() { /* 이전과 동일 */ 
-      if (items.length === 0) return alert('반품 목록이 비어있습니다.');
-      const data = items.map(i => ({
-        '의약품명': i.name, '단위': i.unit, '수량': i.qty,
-        '유통기한': i.expiry, '로트번호': i.lot, '일련번호': i.serial
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "반품목록");
-      XLSX.writeFile(wb, `ReturnRx_반품_${new Date().toISOString().slice(0,10)}.xlsx`);
-    };
+// ══ QR 처리 — 방법1: GS1 파싱 → 방법2: Claude AI 분석 ══
+async function processQR(raw, format){
+  toast('QR 인식됨! 분석 중...');
+  setStep(1,'loading','QR 데이터 읽는 중...','');
 
-    window.sendEmail = function() { /* 이전과 동일 */ 
-      if (items.length === 0) return alert('반품 목록이 비어있습니다.');
-      let body = "반품 신청 목록\n\n";
-      items.forEach(i => {
-        body += `${i.name} | ${i.unit} ${i.qty}개 | 유통기한:${i.expiry} | 로트:${i.lot} | 일련:${i.serial}\n`;
-      });
-      body += `\n\n약국명: __________\n날짜: ${new Date().toISOString().slice(0,10)}`;
-      const mailto = `mailto:your.email@example.com?subject=ReturnRx 반품 신청서&body=${encodeURIComponent(body)}`;
-      window.location.href = mailto;
-    };
+  // 방법1: GS1 직접 파싱
+  let parsed = parseGS1(raw);
+  
+  if(parsed.expiry || parsed.lot || parsed.serial || parsed.gtin){
+    setStep(1,'done','QR 데이터 읽기 완료',`GTIN: ${parsed.gtin||'없음'} · 유통기한: ${parsed.expiry||'없음'}`);
+  } else {
+    setStep(1,'done','QR 데이터 읽기 완료','원시 데이터 확보');
+  }
 
-    window.countPills = async function(input) { /* Roboflow 계수기 그대로 */ 
-      // (생략 - 이전 코드와 동일)
-      const file = input.files[0];
-      if (!file) return;
-      const resultDiv = document.getElementById('count-result');
-      resultDiv.innerHTML = `<p class="text-blue-600">Roboflow AI가 알약을 세는 중...</p>`;
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const res = await fetch('https://detect.roboflow.com/pills-sxdht/1?api_key=D5tgTdayef5RWAWju8RK', { method: 'POST', body: formData });
-        const data = await res.json();
-        const count = data.predictions ? data.predictions.length : 0;
-        resultDiv.innerHTML = `
-          <div class="text-6xl font-bold text-green-600">${count}개</div>
-          <p class="text-sm text-gray-500 mt-2">Roboflow AI 감지</p>
-          <button onclick="addCountToList(${count})" class="mt-6 px-8 py-3 bg-green-600 text-white rounded-3xl">반품 목록에 추가</button>
-        `;
-      } catch(e) { resultDiv.innerHTML = `<p class="text-red-500">인식 실패<br>다시 찍어주세요</p>`; }
-    };
+  // 방법2: Claude AI로 약 이름 + 상세 정보 분석
+  setStep(2,'loading','AI가 약품 정보 분석 중...','');
+  
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:600,
+        messages:[{role:'user',content:`당신은 한국 의약품 전문가입니다. 아래는 의약품 박스에서 스캔한 QR/바코드 원시 데이터입니다.
 
-    window.addCountToList = function(count) {
-      const name = prompt('의약품명 입력', '');
-      if (!name) return;
-      items.unshift({ id: Date.now(), unit: '낱알', qty: count, name, lot: '', expiry: '', serial: '', gtin: '' });
-      saveItems();
-      renderList();
-      switchTab(1);
-    };
+바코드 형식: ${format||'알 수 없음'}
+원시 데이터: ${raw}
 
-    function switchTab(n) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('border-b-4', 'border-blue-600', 'text-blue-600'));
-      document.getElementById(`tab${n}`).classList.add('active');
-      document.getElementById(`tab${n}-btn`).classList.add('border-b-4', 'border-blue-600', 'text-blue-600');
-      if (n === 0) startQR();
+GS1 파싱 결과:
+- GTIN: ${parsed.gtin||'없음'}
+- 유통기한: ${parsed.expiry||'없음'}
+- 로트번호: ${parsed.lot||'없음'}
+- 일련번호: ${parsed.serial||'없음'}
+
+위 정보를 바탕으로:
+1. GTIN이나 데이터로 어떤 약인지 알 수 있으면 약 이름을 알려주세요
+2. GS1 파싱이 잘못됐다면 올바르게 수정해주세요
+3. 모르는 정보는 빈 문자열로 주세요
+
+JSON만 응답 (마크다운 없이):
+{"name":"약품명(모르면 빈 문자열)","expiry":"YYYY-MM-DD","lot":"로트번호","serial":"일련번호","gtin":"GTIN","confidence":"높음|보통|낮음","reason":"약 이름을 어떻게 알았는지 한 줄 설명"}`}]
+      })
+    });
+    const data=await res.json();
+    const txt=(data.content?.[0]?.text||'').replace(/```json|```/g,'').trim();
+    let ai=null; try{ai=JSON.parse(txt);}catch(e){}
+
+    if(ai){
+      // AI 결과와 GS1 파싱 결과 합치기 (AI 우선)
+      const final={
+        name: ai.name||'',
+        expiry: ai.expiry||parsed.expiry||'',
+        lot: ai.lot||parsed.lot||'',
+        serial: ai.serial||parsed.serial||'',
+        gtin: ai.gtin||parsed.gtin||'',
+      };
+
+      setStep(2,'done',
+        ai.name?`"${ai.name}" 인식됨`:'AI 분석 완료',
+        ai.name? `신뢰도: ${ai.confidence||'보통'}` : '약 이름을 직접 입력해주세요'
+      );
+
+      showQRResult(final, ai.name?`✅ ${ai.reason||'AI가 분석했습니다'}`:'⚠️ 약 이름을 확인해주세요');
+    } else {
+      setStep(2,'fail','AI 분석 실패','직접 입력해주세요');
+      showQRResult(parsed, '⚠️ AI 분석 실패 — 약 이름을 직접 입력해주세요');
     }
+  }catch(err){
+    setStep(2,'fail','AI 연결 오류','직접 입력해주세요');
+    showQRResult(parsed, '⚠️ 네트워크 오류 — 약 이름을 직접 입력해주세요');
+  }
+}
 
-    window.onload = function() {
-      tailwind.config = { content: ["*"] };
-      renderList();
-      setTimeout(() => startQR(), 600);
-    };
-  </script>
+function showQRResult(info, labelMsg){
+  pendingQr=info;
+  const fields=[
+    info.name&&{label:'약품명',value:info.name},
+    info.expiry&&{label:'유통기한',value:info.expiry},
+    info.lot&&{label:'로트번호',value:info.lot},
+    info.serial&&{label:'일련번호',value:info.serial},
+    info.gtin&&{label:'GTIN',value:info.gtin},
+  ].filter(Boolean);
+
+  document.getElementById('result-fields').innerHTML=
+    fields.length>0
+      ? fields.map(f=>`<div class="result-field"><span class="rf-label">${f.label}</span><span class="rf-value">${f.value}</span></div>`).join('')
+      : '<div style="font-size:12px;color:#065F46;">QR에서 정보를 추출했습니다</div>';
+  document.getElementById('result-card').style.display='block';
+
+  document.getElementById('name-label').textContent=labelMsg;
+  document.getElementById('name-input').value=info.name||'';
+  document.getElementById('name-box').classList.add('on');
+  if(!info.name) document.getElementById('name-input').focus();
+}
+
+// GS1 직접 파싱
+function parseGS1(raw){
+  let gtin='', expiry='', lot='', serial='';
+
+  // 괄호형: (01)...(17)...(10)...(21)...
+  const bracket=raw.match(/\(01\)(\d{14}).*?\(17\)(\d{6}).*?\(10\)([^\(]+)(?:.*?\(21\)([^\(]*))?/s);
+  if(bracket){
+    gtin=bracket[1];
+    expiry=parseExpiry(bracket[2]);
+    lot=bracket[3].trim();
+    serial=(bracket[4]||'').trim();
+    return{gtin,expiry,lot,serial};
+  }
+
+  // 비괄호형 GS1
+  const s=raw.replace(/^\]d2|^\]C1|^\]Q3/,'');
+  // GTIN (01 + 14자리)
+  const gm=s.match(/(?:^|(?<=\D))01(\d{14})/); if(gm)gtin=gm[1];
+  // 유통기한 (17 + 6자리)
+  const em=s.match(/17(\d{6})/); if(em)expiry=parseExpiry(em[1]);
+  // 로트 (10 + 가변)
+  const lm=s.match(/10([A-Za-z0-9\-]{1,20})/); if(lm)lot=lm[1];
+  // 일련번호 (21 + 가변)
+  const snm=s.match(/21([A-Za-z0-9\-]{1,20})/); if(snm)serial=snm[1];
+
+  // FNC1 구분자 기반 파싱
+  if(!gtin&&!expiry){
+    const parts=s.split('\x1D');
+    parts.forEach(part=>{
+      if(part.startsWith('01')&&part.length>=16)gtin=part.slice(2,16);
+      else if(part.startsWith('17')&&part.length>=8)expiry=parseExpiry(part.slice(2,8));
+      else if(part.startsWith('10'))lot=part.slice(2);
+      else if(part.startsWith('21'))serial=part.slice(2);
+    });
+  }
+
+  return{gtin,expiry,lot,serial};
+}
+
+function saveQrItem(){
+  const name=document.getElementById('name-input').value.trim();
+  if(!name){toast('의약품명을 입력해주세요');return;}
+  if(!pendingQr)return;
+  items.push({
+    id:Date.now(), name, unit:'box', qty:1,
+    expiry:pendingQr.expiry||'',
+    lot:pendingQr.lot||'',
+    serial:pendingQr.serial||''
+  });
+  saveItems(); pendingQr=null;
+  document.getElementById('name-box').classList.remove('on');
+  document.getElementById('result-card').style.display='none';
+  document.getElementById('qr-panel').classList.remove('on');
+  toast('✅ 반품 목록에 추가됐습니다!');
+  // 반품 목록으로 이동
+  setTimeout(()=>go('list',document.querySelectorAll('.nav-item')[1]),500);
+}
+
+function toB64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej; r.readAsDataURL(file);
+  });
+}
+
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('on');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),3000);
+}
+
+renderList();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+</script>
 </body>
 </html>

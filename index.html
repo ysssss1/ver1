@@ -601,79 +601,69 @@ async function qrLoop(){
   setTimeout(qrLoop,350);
 }
 
-// ══ QR 처리 — 방법1: GS1 파싱 → 방법2: Claude AI 분석 ══
+// ══ QR 처리 — 방법1: GS1 파싱 → 방법2: 식약처 API 조회 ══
+const MFDS_KEY = 'c8c645cee4680c87ef7698e4428a64857ba11c599437241ee06de60cf5923fe7';
+
 async function processQR(raw, format){
-  alert('RAW: ' + raw + '\n\nFORMAT: ' + format);
   toast('QR 인식됨! 분석 중...');
-  setStep(1,'loading','QR 데이터 읽는 중...','');
+  setStep(1,'loading','QR 데이터 읽는 중...','');;
 
-  // 방법1: GS1 직접 파싱
+  // 방법1: GS1 파싱
   let parsed = parseGS1(raw);
-  
-  if(parsed.expiry || parsed.lot || parsed.serial || parsed.gtin){
-    setStep(1,'done','QR 데이터 읽기 완료',`GTIN: ${parsed.gtin||'없음'} · 유통기한: ${parsed.expiry||'없음'}`);
-  } else {
-    setStep(1,'done','QR 데이터 읽기 완료','원시 데이터 확보');
+  setStep(1,'done','QR 데이터 읽기 완료',
+    `GTIN: ${parsed.gtin||'없음'} · 유통기한: ${parsed.expiry||'없음'}`);
+
+  // 방법2: 식약처 API로 약 이름 조회 (JSONP)
+  setStep(2,'loading','식약처에서 약품 정보 조회 중...','');
+
+  if(parsed.gtin){
+    try{
+      const name = await lookupDrugByGTIN(parsed.gtin);
+      if(name){
+        setStep(2,'done',`"${name}" 인식됨`,'식약처 DB 조회 성공');
+        showQRResult({...parsed, name}, '✅ 약품명이 자동으로 입력되었습니다. 확인 후 추가하세요.');
+        return;
+      }
+    }catch(e){}
   }
 
-  // 방법2: Claude AI로 약 이름 + 상세 정보 분석
-  setStep(2,'loading','AI가 약품 정보 분석 중...','');
-  
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:600,
-        messages:[{role:'user',content:`당신은 한국 의약품 전문가입니다. 아래는 의약품 박스에서 스캔한 QR/바코드 원시 데이터입니다.
+  // 방법3: GTIN으로 못 찾으면 직접 입력 요청
+  setStep(2,'fail','약품명 자동 조회 실패','직접 입력해주세요');
+  showQRResult(parsed, '⚠️ 약품명을 직접 입력해주세요');
+}
 
-바코드 형식: ${format||'알 수 없음'}
-원시 데이터: ${raw}
+// 식약처 API JSONP 호출
+function lookupDrugByGTIN(gtin){
+  return new Promise((resolve, reject)=>{
+    // GTIN에서 표준코드 추출 (앞 1자리 제거, 13자리)
+    const stdCode = gtin.replace(/^0+/,'').padStart(13,'0');
+    const cbName = 'mfds_cb_' + Date.now();
+    const script = document.createElement('script');
+    const timeout = setTimeout(()=>{
+      delete window[cbName];
+      document.body.removeChild(script);
+      reject(new Error('timeout'));
+    }, 8000);
 
-GS1 파싱 결과:
-- GTIN: ${parsed.gtin||'없음'}
-- 유통기한: ${parsed.expiry||'없음'}
-- 로트번호: ${parsed.lot||'없음'}
-- 일련번호: ${parsed.serial||'없음'}
+    window[cbName] = function(data){
+      clearTimeout(timeout);
+      delete window[cbName];
+      try{ document.body.removeChild(script); }catch(e){}
+      try{
+        const items = data?.body?.items;
+        if(items && items.length > 0){
+          resolve(items[0].ITEM_NAME || '');
+        } else {
+          resolve('');
+        }
+      }catch(e){ resolve(''); }
+    };
 
-위 정보를 바탕으로:
-1. GTIN이나 데이터로 어떤 약인지 알 수 있으면 약 이름을 알려주세요
-2. GS1 파싱이 잘못됐다면 올바르게 수정해주세요
-3. 모르는 정보는 빈 문자열로 주세요
-
-JSON만 응답 (마크다운 없이):
-{"name":"약품명(모르면 빈 문자열)","expiry":"YYYY-MM-DD","lot":"로트번호","serial":"일련번호","gtin":"GTIN","confidence":"높음|보통|낮음","reason":"약 이름을 어떻게 알았는지 한 줄 설명"}`}]
-      })
-    });
-    const data=await res.json();
-    const txt=(data.content?.[0]?.text||'').replace(/```json|```/g,'').trim();
-    let ai=null; try{ai=JSON.parse(txt);}catch(e){}
-
-    if(ai){
-      // AI 결과와 GS1 파싱 결과 합치기 (AI 우선)
-      const final={
-        name: ai.name||'',
-        expiry: ai.expiry||parsed.expiry||'',
-        lot: ai.lot||parsed.lot||'',
-        serial: ai.serial||parsed.serial||'',
-        gtin: ai.gtin||parsed.gtin||'',
-      };
-
-      setStep(2,'done',
-        ai.name?`"${ai.name}" 인식됨`:'AI 분석 완료',
-        ai.name? `신뢰도: ${ai.confidence||'보통'}` : '약 이름을 직접 입력해주세요'
-      );
-
-      showQRResult(final, ai.name?`✅ ${ai.reason||'AI가 분석했습니다'}`:'⚠️ 약 이름을 확인해주세요');
-    } else {
-      setStep(2,'fail','AI 분석 실패','직접 입력해주세요');
-      showQRResult(parsed, '⚠️ AI 분석 실패 — 약 이름을 직접 입력해주세요');
-    }
-  }catch(err){
-    setStep(2,'fail','AI 연결 오류','직접 입력해주세요');
-    showQRResult(parsed, '⚠️ 네트워크 오류 — 약 이름을 직접 입력해주세요');
-  }
+    // 표준코드로 조회
+    script.src = `https://apis.data.go.kr/1471000/DrugPrdtPrmsnInfoService06/getDrugPrdtPrmsnDtlInq05?serviceKey=${MFDS_KEY}&type=jsonp&callback=${cbName}&numOfRows=1&pageNo=1&std_code=${stdCode}`;
+    script.onerror = ()=>{ clearTimeout(timeout); reject(new Error('script error')); };
+    document.body.appendChild(script);
+  });
 }
 
 function showQRResult(info, labelMsg){
@@ -702,36 +692,62 @@ function showQRResult(info, labelMsg){
 function parseGS1(raw){
   let gtin='', expiry='', lot='', serial='';
 
-  // 괄호형: (01)...(17)...(10)...(21)...
-  const bracket=raw.match(/\(01\)(\d{14}).*?\(17\)(\d{6}).*?\(10\)([^\(]+)(?:.*?\(21\)([^\(]*))?/s);
+  // 헤더 제거 (]d2, ]C1, ]Q3 등)
+  let s = raw.replace(/^\]d2|^\]C1|^\]Q3|^\]e0/,'');
+
+  // ── 괄호형: (01)14자리(17)6자리(10)로트(21)일련 ──
+  const bracket = s.match(/\(01\)(\d{14})(?:.*?\(17\)(\d{6}))?(?:.*?\(10\)([^\(]+))?(?:.*?\(21\)([^\(]*))?/s);
   if(bracket){
-    gtin=bracket[1];
-    expiry=parseExpiry(bracket[2]);
-    lot=bracket[3].trim();
-    serial=(bracket[4]||'').trim();
+    gtin = bracket[1]||'';
+    if(bracket[2]) expiry = parseExpiry(bracket[2]);
+    if(bracket[3]) lot = bracket[3].trim();
+    if(bracket[4]) serial = bracket[4].trim();
     return{gtin,expiry,lot,serial};
   }
 
-  // 비괄호형 GS1
-  const s=raw.replace(/^\]d2|^\]C1|^\]Q3/,'');
-  // GTIN (01 + 14자리)
-  const gm=s.match(/(?:^|(?<=\D))01(\d{14})/); if(gm)gtin=gm[1];
-  // 유통기한 (17 + 6자리)
-  const em=s.match(/17(\d{6})/); if(em)expiry=parseExpiry(em[1]);
-  // 로트 (10 + 가변)
-  const lm=s.match(/10([A-Za-z0-9\-]{1,20})/); if(lm)lot=lm[1];
-  // 일련번호 (21 + 가변)
-  const snm=s.match(/21([A-Za-z0-9\-]{1,20})/); if(snm)serial=snm[1];
-
-  // FNC1 구분자 기반 파싱
-  if(!gtin&&!expiry){
-    const parts=s.split('\x1D');
+  // ── FNC1 구분자(\x1D) 기반 파싱 ──
+  if(s.includes('\x1D')){
+    const parts = s.split('\x1D');
     parts.forEach(part=>{
-      if(part.startsWith('01')&&part.length>=16)gtin=part.slice(2,16);
-      else if(part.startsWith('17')&&part.length>=8)expiry=parseExpiry(part.slice(2,8));
-      else if(part.startsWith('10'))lot=part.slice(2);
-      else if(part.startsWith('21'))serial=part.slice(2);
+      if(part.startsWith('01') && part.length>=16){ gtin=part.slice(2,16); }
+      else if(part.startsWith('17') && part.length>=8){ expiry=parseExpiry(part.slice(2,8)); }
+      else if(part.startsWith('10')){ lot=part.slice(2).trim(); }
+      else if(part.startsWith('21')){ serial=part.slice(2).trim(); }
     });
+    if(gtin||expiry||lot||serial) return{gtin,expiry,lot,serial};
+  }
+
+  // ── 연속형 숫자 파싱 (구분자 없이 AI 코드가 연속된 경우) ──
+  // 예: 0108806963007610172612311012345621SN123
+  let pos = 0;
+  while(pos < s.length){
+    const ai2 = s.slice(pos, pos+2);
+    const ai3 = s.slice(pos, pos+3);
+    if(ai2==='01' && /^\d{14}/.test(s.slice(pos+2))){
+      gtin = s.slice(pos+2, pos+16); pos+=16;
+    } else if(ai2==='17' && /^\d{6}/.test(s.slice(pos+2))){
+      expiry = parseExpiry(s.slice(pos+2, pos+8)); pos+=8;
+    } else if(ai2==='10'){
+      // 가변 길이 — 다음 AI코드(21,17,01,11,15) 또는 끝까지
+      const rest = s.slice(pos+2);
+      const next = rest.search(/^(21|17|01|11|15)\d/m);
+      const end = next>=0 ? next : rest.length;
+      lot = rest.slice(0,end).trim(); pos += 2+end;
+    } else if(ai2==='21'){
+      const rest = s.slice(pos+2);
+      const next = rest.search(/^(10|17|01|11|15)\d/m);
+      const end = next>=0 ? next : rest.length;
+      serial = rest.slice(0,end).trim(); pos += 2+end;
+    } else {
+      pos++;
+    }
+  }
+
+  // ── 마지막 수단: 단순 GTIN 형식 (01 + 14자리가 전부인 경우) ──
+  // 예: 0108806963007610 (이 약의 QR 형식)
+  if(!gtin){
+    const simple = s.match(/^01(\d{14})$/);
+    if(simple) gtin = simple[1];
   }
 
   return{gtin,expiry,lot,serial};

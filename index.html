@@ -603,6 +603,7 @@ async function qrLoop(){
 
 // ══ QR 처리 — 방법1: GS1 파싱 → 방법2: Claude AI 분석 ══
 async function processQR(raw, format){
+  alert('RAW: ' + raw + '\n\nFORMAT: ' + format);
   toast('QR 인식됨! 분석 중...');
   setStep(1,'loading','QR 데이터 읽는 중...','');
 

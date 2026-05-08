@@ -258,9 +258,24 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,'Pretendar
 <div class="screen" id="s-qr">
   <div class="hd">
     <div class="hd-title">🔍 QR 스캔</div>
-    <div class="hd-sub">약 박스 QR → 약품 정보 자동 인식</div>
+    <div class="hd-sub" id="qr-hd-sub">1단계: QR코드 스캔</div>
   </div>
-  <div class="sec">
+
+  <!-- 단계 표시 -->
+  <div style="display:flex;align-items:center;padding:12px 16px 0;gap:0;">
+    <div style="display:flex;align-items:center;gap:6px;flex:1;">
+      <div id="step-dot-1" style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+      <span id="step-txt-1" style="font-size:12px;font-weight:700;color:var(--primary);">QR 스캔</span>
+    </div>
+    <div style="flex:1;height:2px;background:var(--border);margin:0 4px;"></div>
+    <div style="display:flex;align-items:center;gap:6px;flex:1;">
+      <div id="step-dot-2" style="width:28px;height:28px;border-radius:50%;background:var(--border);color:var(--muted);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+      <span id="step-txt-2" style="font-size:12px;font-weight:700;color:var(--muted);">사진으로 정보 읽기</span>
+    </div>
+  </div>
+
+  <!-- 1단계: QR 카메라 -->
+  <div id="step1-area" class="sec">
     <div class="card">
       <div class="cam-wrap">
         <div class="cam-ph" id="cam-ph">
@@ -278,54 +293,85 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,'Pretendar
         <div class="cam-hint" id="cam-hint" style="display:none;">약 박스의 QR코드를 네모 안에 맞춰주세요</div>
       </div>
     </div>
-  </div>
-
-  <button class="btn-scan" id="scan-btn" onclick="toggleCamera()">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
-    카메라 시작
-  </button>
-
-  <!-- 진행 패널 -->
-  <div class="qr-panel card" id="qr-panel">
-    <!-- 1단계: QR 파싱 -->
-    <div class="step-row" id="step1-row">
-      <div class="step-icon idle" id="step1-icon">1</div>
-      <div class="step-info">
-        <div class="step-title" id="step1-title">QR 데이터 읽기</div>
-        <div class="step-desc" id="step1-desc">스캔 대기 중</div>
+    <button class="btn-scan" id="scan-btn" onclick="toggleCamera()" style="margin-top:10px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/></svg>
+      카메라 시작
+    </button>
+    <!-- QR 인식 결과 -->
+    <div id="qr-result-box" style="display:none;" class="card" >
+      <div style="background:var(--okl);padding:12px 14px;border-bottom:1px solid #D1FAE5;">
+        <div style="font-size:12px;font-weight:700;color:var(--ok);margin-bottom:6px;">✅ QR 인식 완료</div>
+        <div id="qr-result-fields" style="font-size:13px;color:#064E3B;line-height:1.8;"></div>
       </div>
-    </div>
-    <!-- 2단계: AI 분석 -->
-    <div class="step-row" id="step2-row">
-      <div class="step-icon idle" id="step2-icon">2</div>
-      <div class="step-info">
-        <div class="step-title" id="step2-title">AI 약품 정보 분석</div>
-        <div class="step-desc" id="step2-desc">QR 인식 후 시작됩니다</div>
+      <div style="padding:12px 14px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📸 이제 박스 뒷면을 찍어서 사용기한·제조번호를 읽겠습니다</div>
+        <button onclick="goStep2()" style="width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:var(--rs);font-size:14px;font-weight:700;cursor:pointer;">
+          2단계: 박스 사진 찍기 →
+        </button>
+        <button onclick="skipStep2()" style="width:100%;margin-top:8px;padding:10px;background:var(--bg);color:var(--muted);border:none;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;">
+          사용기한·제조번호 직접 입력
+        </button>
       </div>
-    </div>
-    <!-- 결과 -->
-    <div class="result-card" id="result-card" style="display:none;">
-      <div class="result-card-title">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        인식된 정보
-      </div>
-      <div id="result-fields"></div>
-    </div>
-    <!-- 이름 입력 -->
-    <div class="name-box" id="name-box">
-      <div class="name-label" id="name-label">✏️ 의약품명을 입력해주세요</div>
-      <input class="name-input" id="name-input" type="text" placeholder="예: 타이레놀 500mg 60정">
-      <button class="btn-name-save" onclick="saveQrItem()">반품 목록에 추가 →</button>
     </div>
   </div>
 
-  <div class="sec" style="margin-top:10px;">
-    <div class="card" style="padding:13px 16px;">
-      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;">💡 스캔 안내</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
-        · 약 박스 옆면의 <strong>작은 QR/바코드</strong>를 스캔하세요<br>
-        · 인식되면 AI가 약 이름·유통기한·로트·일련번호를 자동 분석합니다<br>
-        · 약 이름 확인 후 목록에 추가하면 완료입니다
+  <!-- 2단계: 박스 사진 촬영 -->
+  <div id="step2-area" style="display:none;" class="sec">
+    <div class="card" style="overflow:visible;">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">📸 박스 뒷면을 찍어주세요</div>
+        <div style="font-size:12px;color:var(--muted);">사용기한·제조번호가 보이도록 찍으면 AI가 자동으로 읽습니다</div>
+      </div>
+      <!-- 사진 미리보기 -->
+      <div id="box-img-wrap" style="display:none;background:#111;max-height:240px;overflow:hidden;">
+        <img id="box-img" style="width:100%;max-height:240px;object-fit:contain;display:block;" alt="">
+      </div>
+      <!-- AI 분석 중 -->
+      <div id="box-loading" style="display:none;padding:18px 16px;display:none;align-items:center;gap:10px;">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <span style="font-size:13px;color:var(--muted);">AI가 사용기한·제조번호 읽는 중...</span>
+      </div>
+      <!-- 촬영 버튼 -->
+      <label id="box-photo-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:var(--primary);color:#fff;font-size:14px;font-weight:700;cursor:pointer;border-top:1px solid var(--border);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        사진 촬영 / 갤러리 선택
+        <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleBoxPhoto(event)">
+      </label>
+    </div>
+  </div>
+
+  <!-- 최종 확인 및 추가 -->
+  <div id="final-area" style="display:none;" class="sec">
+    <div class="card">
+      <div style="padding:12px 14px;background:var(--okl);border-bottom:1px solid #D1FAE5;">
+        <div style="font-size:12px;font-weight:700;color:var(--ok);margin-bottom:8px;">✅ 인식된 정보 확인</div>
+        <div id="final-fields" style="font-size:13px;color:#064E3B;line-height:1.9;"></div>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">의약품명 확인/수정</div>
+          <input id="final-name" class="field-input" type="text" placeholder="예: 타이레놀 500mg 60정" style="border:1.5px solid var(--border);border-radius:var(--rs);padding:10px 12px;font-size:15px;width:100%;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">사용기한</div>
+            <input id="final-expiry" class="field-input" type="text" placeholder="YYYYMMDD" style="border:1.5px solid var(--border);border-radius:var(--rs);padding:10px 12px;font-size:14px;width:100%;">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">제조번호(LOT)</div>
+            <input id="final-lot" class="field-input" type="text" placeholder="LOT No." style="border:1.5px solid var(--border);border-radius:var(--rs);padding:10px 12px;font-size:14px;width:100%;">
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">일련번호</div>
+          <input id="final-serial" class="field-input" type="text" placeholder="Serial No." style="border:1.5px solid var(--border);border-radius:var(--rs);padding:10px 12px;font-size:14px;width:100%;">
+        </div>
+        <button onclick="saveFinalItem()" style="width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:var(--rs);font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;">
+          반품 목록에 추가 →
+        </button>
+        <button onclick="resetQR()" style="width:100%;padding:10px;background:var(--bg);color:var(--muted);border:none;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;">
+          다시 스캔하기
+        </button>
       </div>
     </div>
   </div>
@@ -537,15 +583,29 @@ function sendEmail(){
   toast('이메일 앱을 열고 있습니다...');
 }
 
-// ══ QR 스캔 ══
-function setStep(num, state, title, desc){
-  const icon=document.getElementById(`step${num}-icon`);
-  const t=document.getElementById(`step${num}-title`);
-  const d=document.getElementById(`step${num}-desc`);
-  icon.className='step-icon '+state;
-  icon.innerHTML = state==='done'?'✓': state==='loading'?'<div class="dots" style="gap:3px"><span style="width:5px;height:5px"></span><span style="width:5px;height:5px"></span><span style="width:5px;height:5px"></span></div>': state==='fail'?'✕': num;
-  if(title)t.textContent=title;
-  if(desc)d.textContent=desc;
+// ══ QR 스캔 — 2단계 ══
+let qrParsed = null;
+
+function updateStepUI(active){
+  const d1=document.getElementById('step-dot-1');
+  const d2=document.getElementById('step-dot-2');
+  const t1=document.getElementById('step-txt-1');
+  const t2=document.getElementById('step-txt-2');
+  if(active===1){
+    d1.style.cssText='width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    d1.textContent='1';
+    d2.style.cssText='width:28px;height:28px;border-radius:50%;background:var(--border);color:var(--muted);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    d2.textContent='2';
+    t1.style.color='var(--primary)'; t2.style.color='var(--muted)';
+    document.getElementById('qr-hd-sub').textContent='1단계: QR코드 스캔';
+  } else {
+    d1.style.cssText='width:28px;height:28px;border-radius:50%;background:var(--ok);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    d1.textContent='✓';
+    d2.style.cssText='width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    d2.textContent='2';
+    t1.style.color='var(--ok)'; t2.style.color='var(--primary)';
+    document.getElementById('qr-hd-sub').textContent='2단계: 박스 사진으로 정보 읽기';
+  }
 }
 
 async function toggleCamera(){
@@ -558,15 +618,10 @@ async function toggleCamera(){
     document.getElementById('cam-ph').style.display='none';
     document.getElementById('cam-overlay').style.display='flex';
     document.getElementById('cam-hint').style.display='block';
-    document.getElementById('scan-btn').textContent='⏹ 카메라 중지';
-    // 패널 초기화
-    document.getElementById('qr-panel').classList.add('on');
-    document.getElementById('result-card').style.display='none';
-    document.getElementById('name-box').classList.remove('on');
-    setStep(1,'idle','QR 데이터 읽기','QR코드를 네모 안에 맞춰주세요');
-    setStep(2,'idle','AI 약품 정보 분석','QR 인식 후 시작됩니다');
+    document.getElementById('scan-btn').innerHTML='⏹ 카메라 중지';
+    document.getElementById('qr-result-box').style.display='none';
     video.onloadedmetadata=()=>qrLoop();
-    toast('약 박스 QR코드를 네모 안에 맞춰주세요');
+    toast('약 박스의 QR코드를 네모 안에 맞춰주세요');
   }catch(e){toast('카메라 권한이 필요합니다');}
 }
 
@@ -601,176 +656,153 @@ async function qrLoop(){
   setTimeout(qrLoop,350);
 }
 
-// ══ QR 처리 — 방법1: GS1 파싱 → 방법2: 식약처 API 조회 ══
-const MFDS_KEY = 'c8c645cee4680c87ef7698e4428a64857ba11c599437241ee06de60cf5923fe7';
-
-async function processQR(raw, format){
-  toast('QR 인식됨! 분석 중...');
-  setStep(1,'loading','QR 데이터 읽는 중...','');;
-
-  // 방법1: GS1 파싱
-  let parsed = parseGS1(raw);
-  setStep(1,'done','QR 데이터 읽기 완료',
-    `GTIN: ${parsed.gtin||'없음'} · 유통기한: ${parsed.expiry||'없음'}`);
-
-  // 방법2: 식약처 API로 약 이름 조회 (JSONP)
-  setStep(2,'loading','식약처에서 약품 정보 조회 중...','');
-
-  if(parsed.gtin){
-    try{
-      const name = await lookupDrugByGTIN(parsed.gtin);
-      if(name){
-        setStep(2,'done',`"${name}" 인식됨`,'식약처 DB 조회 성공');
-        showQRResult({...parsed, name}, '✅ 약품명이 자동으로 입력되었습니다. 확인 후 추가하세요.');
-        return;
-      }
-    }catch(e){}
-  }
-
-  // 방법3: GTIN으로 못 찾으면 직접 입력 요청
-  setStep(2,'fail','약품명 자동 조회 실패','직접 입력해주세요');
-  showQRResult(parsed, '⚠️ 약품명을 직접 입력해주세요');
-}
-
-// 식약처 API JSONP 호출
-function lookupDrugByGTIN(gtin){
-  return new Promise((resolve, reject)=>{
-    // GTIN에서 표준코드 추출 (앞 1자리 제거, 13자리)
-    const stdCode = gtin.replace(/^0+/,'').padStart(13,'0');
-    const cbName = 'mfds_cb_' + Date.now();
-    const script = document.createElement('script');
-    const timeout = setTimeout(()=>{
-      delete window[cbName];
-      document.body.removeChild(script);
-      reject(new Error('timeout'));
-    }, 8000);
-
-    window[cbName] = function(data){
-      clearTimeout(timeout);
-      delete window[cbName];
-      try{ document.body.removeChild(script); }catch(e){}
-      try{
-        const items = data?.body?.items;
-        if(items && items.length > 0){
-          resolve(items[0].ITEM_NAME || '');
-        } else {
-          resolve('');
-        }
-      }catch(e){ resolve(''); }
-    };
-
-    // 표준코드로 조회
-    script.src = `https://apis.data.go.kr/1471000/DrugPrdtPrmsnInfoService06/getDrugPrdtPrmsnDtlInq05?serviceKey=${MFDS_KEY}&type=jsonp&callback=${cbName}&numOfRows=1&pageNo=1&std_code=${stdCode}`;
-    script.onerror = ()=>{ clearTimeout(timeout); reject(new Error('script error')); };
-    document.body.appendChild(script);
-  });
-}
-
-function showQRResult(info, labelMsg){
-  pendingQr=info;
-  const fields=[
-    info.name&&{label:'약품명',value:info.name},
-    info.expiry&&{label:'유통기한',value:info.expiry},
-    info.lot&&{label:'로트번호',value:info.lot},
-    info.serial&&{label:'일련번호',value:info.serial},
-    info.gtin&&{label:'GTIN',value:info.gtin},
+// ══ QR 처리 ══
+function processQR(raw){
+  toast('✅ QR 인식 완료!');
+  qrParsed = parseGS1(raw);
+  const fields = [
+    qrParsed.gtin && `<b>GTIN:</b> ${qrParsed.gtin}`,
+    qrParsed.serial && `<b>일련번호:</b> ${qrParsed.serial}`,
+    qrParsed.lot && `<b>제조번호:</b> ${qrParsed.lot}`,
+    qrParsed.expiry && `<b>사용기한:</b> ${qrParsed.expiry}`,
   ].filter(Boolean);
-
-  document.getElementById('result-fields').innerHTML=
-    fields.length>0
-      ? fields.map(f=>`<div class="result-field"><span class="rf-label">${f.label}</span><span class="rf-value">${f.value}</span></div>`).join('')
-      : '<div style="font-size:12px;color:#065F46;">QR에서 정보를 추출했습니다</div>';
-  document.getElementById('result-card').style.display='block';
-
-  document.getElementById('name-label').textContent=labelMsg;
-  document.getElementById('name-input').value=info.name||'';
-  document.getElementById('name-box').classList.add('on');
-  if(!info.name) document.getElementById('name-input').focus();
+  document.getElementById('qr-result-fields').innerHTML = fields.length > 0 ? fields.join('<br>') : `원시데이터: ${raw.slice(0,40)}`;
+  document.getElementById('qr-result-box').style.display='block';
+  updateStepUI(1);
 }
 
-// GS1 직접 파싱
+// GS1 파싱
 function parseGS1(raw){
   let gtin='', expiry='', lot='', serial='';
-
-  // 헤더 제거 (]d2, ]C1, ]Q3 등)
   let s = raw.replace(/^\]d2|^\]C1|^\]Q3|^\]e0/,'');
-
-  // ── 괄호형: (01)14자리(17)6자리(10)로트(21)일련 ──
   const bracket = s.match(/\(01\)(\d{14})(?:.*?\(17\)(\d{6}))?(?:.*?\(10\)([^\(]+))?(?:.*?\(21\)([^\(]*))?/s);
   if(bracket){
-    gtin = bracket[1]||'';
-    if(bracket[2]) expiry = parseExpiry(bracket[2]);
-    if(bracket[3]) lot = bracket[3].trim();
-    if(bracket[4]) serial = bracket[4].trim();
+    gtin=bracket[1]||'';
+    if(bracket[2])expiry=parseExpiry(bracket[2]);
+    if(bracket[3])lot=bracket[3].trim();
+    if(bracket[4])serial=bracket[4].trim();
     return{gtin,expiry,lot,serial};
   }
-
-  // ── FNC1 구분자(\x1D) 기반 파싱 ──
   if(s.includes('\x1D')){
-    const parts = s.split('\x1D');
-    parts.forEach(part=>{
-      if(part.startsWith('01') && part.length>=16){ gtin=part.slice(2,16); }
-      else if(part.startsWith('17') && part.length>=8){ expiry=parseExpiry(part.slice(2,8)); }
-      else if(part.startsWith('10')){ lot=part.slice(2).trim(); }
-      else if(part.startsWith('21')){ serial=part.slice(2).trim(); }
+    s.split('\x1D').forEach(p=>{
+      if(p.startsWith('01')&&p.length>=16)gtin=p.slice(2,16);
+      else if(p.startsWith('17')&&p.length>=8)expiry=parseExpiry(p.slice(2,8));
+      else if(p.startsWith('10'))lot=p.slice(2).trim();
+      else if(p.startsWith('21'))serial=p.slice(2).trim();
     });
-    if(gtin||expiry||lot||serial) return{gtin,expiry,lot,serial};
+    if(gtin||serial)return{gtin,expiry,lot,serial};
   }
-
-  // ── 연속형 숫자 파싱 (구분자 없이 AI 코드가 연속된 경우) ──
-  // 예: 0108806963007610172612311012345621SN123
-  let pos = 0;
-  while(pos < s.length){
-    const ai2 = s.slice(pos, pos+2);
-    const ai3 = s.slice(pos, pos+3);
-    if(ai2==='01' && /^\d{14}/.test(s.slice(pos+2))){
-      gtin = s.slice(pos+2, pos+16); pos+=16;
-    } else if(ai2==='17' && /^\d{6}/.test(s.slice(pos+2))){
-      expiry = parseExpiry(s.slice(pos+2, pos+8)); pos+=8;
-    } else if(ai2==='10'){
-      // 가변 길이 — 다음 AI코드(21,17,01,11,15) 또는 끝까지
-      const rest = s.slice(pos+2);
-      const next = rest.search(/^(21|17|01|11|15)\d/m);
-      const end = next>=0 ? next : rest.length;
-      lot = rest.slice(0,end).trim(); pos += 2+end;
-    } else if(ai2==='21'){
-      const rest = s.slice(pos+2);
-      const next = rest.search(/^(10|17|01|11|15)\d/m);
-      const end = next>=0 ? next : rest.length;
-      serial = rest.slice(0,end).trim(); pos += 2+end;
-    } else {
-      pos++;
-    }
+  let pos=0;
+  while(pos<s.length){
+    const a=s.slice(pos,pos+2);
+    if(a==='01'&&/^\d{14}/.test(s.slice(pos+2))){gtin=s.slice(pos+2,pos+16);pos+=16;}
+    else if(a==='17'&&/^\d{6}/.test(s.slice(pos+2))){expiry=parseExpiry(s.slice(pos+2,pos+8));pos+=8;}
+    else if(a==='10'){const r=s.slice(pos+2);const n=r.search(/(21|17|01)\d/);const e=n>=0?n:r.length;lot=r.slice(0,e).trim();pos+=2+e;}
+    else if(a==='21'){const r=s.slice(pos+2);const n=r.search(/(10|17|01)\d/);const e=n>=0?n:r.length;serial=r.slice(0,e).trim();pos+=2+e;}
+    else pos++;
   }
-
-  // ── 마지막 수단: 단순 GTIN 형식 (01 + 14자리가 전부인 경우) ──
-  // 예: 0108806963007610 (이 약의 QR 형식)
-  if(!gtin){
-    const simple = s.match(/^01(\d{14})$/);
-    if(simple) gtin = simple[1];
-  }
-
+  if(!gtin){const m=s.match(/^01(\d{14})$/);if(m)gtin=m[1];}
   return{gtin,expiry,lot,serial};
 }
 
-function saveQrItem(){
-  const name=document.getElementById('name-input').value.trim();
-  if(!name){toast('의약품명을 입력해주세요');return;}
-  if(!pendingQr)return;
-  items.push({
-    id:Date.now(), name, unit:'box', qty:1,
-    expiry:pendingQr.expiry||'',
-    lot:pendingQr.lot||'',
-    serial:pendingQr.serial||''
-  });
-  saveItems(); pendingQr=null;
-  document.getElementById('name-box').classList.remove('on');
-  document.getElementById('result-card').style.display='none';
-  document.getElementById('qr-panel').classList.remove('on');
-  toast('✅ 반품 목록에 추가됐습니다!');
-  // 반품 목록으로 이동
-  setTimeout(()=>go('list',document.querySelectorAll('.nav-item')[1]),500);
+function goStep2(){
+  document.getElementById('step2-area').style.display='block';
+  document.getElementById('step2-area').scrollIntoView({behavior:'smooth'});
+  updateStepUI(2);
 }
+
+function skipStep2(){
+  showFinal({name:'', expiry:qrParsed?.expiry||'', lot:qrParsed?.lot||'', serial:qrParsed?.serial||''});
+}
+
+async function handleBoxPhoto(e){
+  const file=e.target.files[0]; if(!file)return; e.target.value='';
+  const img=document.getElementById('box-img');
+  img.src=URL.createObjectURL(file);
+  document.getElementById('box-img-wrap').style.display='block';
+  document.getElementById('box-loading').style.display='flex';
+  document.getElementById('box-photo-btn').style.display='none';
+  const b64=await toB64(file);
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',max_tokens:400,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:file.type,data:b64}},
+          {type:'text',text:`이 의약품 박스/용기 사진에서 다음 정보를 찾아 JSON만 응답 (마크다운 없이):
+{"name":"약품명(상품명+용량+제형)","expiry":"YYYY-MM-DD 형식 사용기한","lot":"제조번호/LOT번호","serial":"(21)로 표시된 일련번호"}
+없는 정보는 빈 문자열. 사용기한은 YY.MM.DD, YYYY.MM.DD, YYYYMMDD 등 다양한 형식 가능.`}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    const txt=(data.content?.[0]?.text||'').replace(/\`\`\`json|\`\`\`/g,'').trim();
+    let p=null; try{p=JSON.parse(txt);}catch(e){}
+    document.getElementById('box-loading').style.display='none';
+    if(p){
+      showFinal({
+        name:p.name||'',
+        expiry:p.expiry?parseExpiry(p.expiry):(qrParsed?.expiry||''),
+        lot:p.lot||qrParsed?.lot||'',
+        serial:p.serial||qrParsed?.serial||'',
+      });
+    }else{
+      showFinal({name:'',expiry:qrParsed?.expiry||'',lot:qrParsed?.lot||'',serial:qrParsed?.serial||''});
+      toast('자동 인식 실패 — 직접 입력해주세요');
+    }
+  }catch(err){
+    document.getElementById('box-loading').style.display='none';
+    showFinal({name:'',expiry:qrParsed?.expiry||'',lot:qrParsed?.lot||'',serial:qrParsed?.serial||''});
+    toast('오류 발생 — 직접 입력해주세요');
+  }
+}
+
+function showFinal(info){
+  document.getElementById('step1-area').style.display='none';
+  document.getElementById('step2-area').style.display='none';
+  document.getElementById('final-area').style.display='block';
+  const fields=[
+    qrParsed?.gtin&&`<b>GTIN:</b> ${qrParsed.gtin}`,
+    info.name&&`<b>약품명:</b> ${info.name}`,
+    info.expiry&&`<b>사용기한:</b> ${info.expiry}`,
+    info.lot&&`<b>제조번호:</b> ${info.lot}`,
+    info.serial&&`<b>일련번호:</b> ${info.serial}`,
+  ].filter(Boolean);
+  document.getElementById('final-fields').innerHTML=fields.join('<br>');
+  document.getElementById('final-name').value=info.name||'';
+  document.getElementById('final-expiry').value=info.expiry||'';
+  document.getElementById('final-lot').value=info.lot||'';
+  document.getElementById('final-serial').value=info.serial||'';
+  document.getElementById('final-area').scrollIntoView({behavior:'smooth'});
+}
+
+function saveFinalItem(){
+  const name=document.getElementById('final-name').value.trim();
+  if(!name){toast('의약품명을 입력해주세요');return;}
+  items.push({
+    id:Date.now(),name,unit:'box',qty:1,
+    expiry:parseExpiry(document.getElementById('final-expiry').value.trim()),
+    lot:document.getElementById('final-lot').value.trim(),
+    serial:document.getElementById('final-serial').value.trim(),
+  });
+  saveItems();
+  toast('✅ 반품 목록에 추가됐습니다!');
+  setTimeout(()=>go('list',document.querySelectorAll('.nav-item')[1]),400);
+  resetQR();
+}
+
+function resetQR(){
+  qrParsed=null;
+  document.getElementById('step1-area').style.display='block';
+  document.getElementById('step2-area').style.display='none';
+  document.getElementById('final-area').style.display='none';
+  document.getElementById('qr-result-box').style.display='none';
+  document.getElementById('box-img-wrap').style.display='none';
+  document.getElementById('box-photo-btn').style.display='flex';
+  updateStepUI(1);
+}
+
 
 function toB64(file){
   return new Promise((res,rej)=>{
